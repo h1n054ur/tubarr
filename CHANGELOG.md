@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Tubarr are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [semantic versioning](https://semver.org), on 0.x until 1.0 (see "Versions and releases" in the README).
+All notable changes to Tubarr are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [semantic versioning](https://semver.org), on 0.x until 1.0 (see [the upgrade docs](https://h1n054ur.github.io/tubarr/operations/backups-and-upgrades/#versions)).
 
 ## [0.1.0] - 2026-11-04
 
@@ -56,13 +56,16 @@ The first public release. It covers everything built so far.
 - An optional Prometheus endpoint, `/metrics`, for lookups, plays, first byte times, the matcher, the arrs and memory, behind a token.
 - A Docker image running as uid 1000, built for amd64 and arm64 and published to GHCR, tagged `X.Y.Z`, `X.Y` and `latest`.
 - A demo mode with seeded data.
-- Measured memory figures in the README and a 1g memory limit in the compose example.
-- A copy of the database before an upgrade migrates it, the newest 3 kept (`[backup]`), and a README section on what to back up and how to go back to an older version.
+- Measured memory figures ([sizing page](https://h1n054ur.github.io/tubarr/operations/sizing/)) and a 1g memory limit in the compose example.
+- A copy of the database before an upgrade migrates it, the newest 3 kept (`[backup]`), and a docs page on what to back up and how to go back to an older version ([backups and upgrades page](https://h1n054ur.github.io/tubarr/operations/backups-and-upgrades/)).
 - Mapping export and import, with their rules, aliases and pins, after a dry run (Settings, or the admin API).
+- An optional `[network]` proxy, set with `proxy` or `proxy_file` (http, https, socks5 or socks5h), for hosts whose own address YouTube answers with a bot check. It carries YouTube traffic only: yt-dlp, channel feeds, channel pages, thumbnails, the `/play` relay and captions. Sonarr, Radarr, Jellyfin, notices, sign-in, drafts lookups and the yt-dlp and deno downloads do not use it, and the proxy's user name and password are never shown.
+- The clients that go straight out ignore the `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and `NO_PROXY` environment variables, so a proxy that Docker sets for every container does not catch them.
+- Errors in the config file name the line and the key and never quote the file, since the line may hold a password or an API key.
 
 ### Project
 
 - CI checks the licences of Rust crates and npm packages and the RustSec advisories, and the image carries the third-party notices.
 - Security and contributing guides.
 - A Starlight docs site with install and quick start pages.
-- Docs pages for configuration, Sonarr, Radarr, Prowlarr and Jellyfin, using Tubarr, operations, privacy, the admin API, the FAQ and the terms of use.
+- Docs pages for configuration, Sonarr, Radarr, Prowlarr and Jellyfin, using Tubarr, operations, privacy, the admin API, the FAQ and the terms of use, plus a "Where to run it" page on home connections versus VPS hosts and a monitoring page.

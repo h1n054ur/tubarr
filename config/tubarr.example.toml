@@ -183,7 +183,7 @@ public_url = "http://tubarr.example.lan:8480"
 # po_token_url = "http://bgutil:4416"   # a bgutil PO token HTTP server
 # plugin_dir = "/opt/yt-dlp-plugins"    # the image ships the matching bgutil plugin here
 # cookies_file = "/run/secrets/youtube_cookies"  # a spare account only, never written back. Google
-#                                       # can flag or close it, see "Terms and personal use" in the README
+#                                       # can flag or close it, see https://h1n054ur.github.io/tubarr/about/terms/
 # sticky_for = "1h"                     # after the PO token step works, lookups start there this long (cookies are never sticky)
 # min_height = 720                      # a fallback answer below this video height counts as failed
 
@@ -196,7 +196,7 @@ public_url = "http://tubarr.example.lan:8480"
 
 # Optional notices: the canary failing and recovering, cookies use, yt-dlp and deno updates, grabs
 # (one notice per 10 minutes) and a daily unmatched digest. Set a Discord webhook, or a JSON
-# webhook URL with its token, not both. See "Notices" in the README for the JSON body.
+# webhook URL with its token, not both. See https://h1n054ur.github.io/tubarr/setup/configuration/#notify for the JSON body.
 [notify]
 # discord_webhook_file = "/run/secrets/discord_webhook"   # a file holding a Discord webhook URL.
 #                                                         # Tubarr posts each notice as a card
@@ -261,9 +261,18 @@ public_url = "http://tubarr.example.lan:8480"
 # merge_retry = "30s"                              # first wait for Jellyfin's scan, doubled each time
 # merge_attempts = 7                               # looks before a merge is given up on
 
-# Optional, off by default. A Prometheus endpoint at /metrics (see "Monitoring" in the README).
+# Optional, off by default. A Prometheus endpoint at /metrics (see https://h1n054ur.github.io/tubarr/operations/monitoring/).
 # [metrics]
 # enabled = true
 # token_file = "/run/secrets/metrics_token"   # the scraper sends it as Authorization: Bearer. Without
 #                                             # it the API key is the token, and with neither only
 #                                             # auth.play_allowed_networks may scrape
+
+# Optional, off by default. Sends everything Tubarr asks YouTube (yt-dlp, feeds, channel pages,
+# thumbnails, the /play media fetches) through a proxy, for hosts whose own address YouTube
+# answers with a bot check. Sonarr, Radarr, Jellyfin, notices and the yt-dlp and deno downloads
+# never use it. Set proxy or proxy_file, not both.
+# [network]
+# proxy = "socks5h://10.0.0.2:1080"           # http://, https://, socks5:// or socks5h://
+# proxy_file = "/run/secrets/tubarr_proxy"    # the same URL in a file, when it holds a user name
+#                                             # and password

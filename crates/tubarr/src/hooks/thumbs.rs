@@ -13,7 +13,11 @@ use std::{
 use url::Url;
 
 use super::library::{LABEL, Library, read_link};
-use crate::{play::parts, sabnzbd::strm::write_atomic};
+use crate::{
+    network::{self, OutboundProxy},
+    play::parts,
+    sabnzbd::strm::write_atomic,
+};
 
 /// The image Jellyfin takes for `<episode>.strm`.
 pub const SUFFIX: &str = "-thumb.jpg";
@@ -45,11 +49,11 @@ pub struct Thumbs {
 }
 
 impl Thumbs {
-    /// `base` is `[hooks] thumbnail_url`, `https://i.ytimg.com/` outside tests.
-    pub fn new(base: Url) -> Result<Self, reqwest::Error> {
-        let http = reqwest::Client::builder()
-            .timeout(Duration::from_secs(20))
-            .build()?;
+    /// `base` is `[hooks] thumbnail_url`, `https://i.ytimg.com/` outside tests. `proxy` is
+    /// `[network] proxy`.
+    pub fn new(base: Url, proxy: Option<&OutboundProxy>) -> Result<Self, reqwest::Error> {
+        let builder = reqwest::Client::builder().timeout(Duration::from_secs(20));
+        let http = network::youtube_client(builder, proxy)?.build()?;
         Ok(Self { http, base })
     }
 
@@ -194,5 +198,33 @@ mod tests {
         assert_eq!(thumb_path(Path::new("/m/Show/a - Audio only.strm")), None);
         assert_eq!(thumb_path(Path::new("/m/Show/a.mkv")), None);
         assert_eq!(thumb_path(Path::new("/m/Show/.strm")), None);
+    }
+
+    #[tokio::test]
+    async fn thumbnails_go_through_the_outbound_proxy() {
+        use std::sync::{Arc, Mutex};
+
+        // A plain HTTP proxy that records each absolute URL and answers it itself, so the
+        // `.test` host is reachable only through it.
+        let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+        let log = seen.clone();
+        let router = axum::Router::new().fallback(move |uri: axum::http::Uri| {
+            let log = log.clone();
+            async move {
+                log.lock().unwrap().push(uri.to_string());
+                "jpeg bytes"
+            }
+        });
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+
+        let proxy = OutboundProxy::parse(&format!("http://u:p@{addr}")).unwrap();
+        let thumbs = Thumbs::new(Url::parse("http://ytimg.test/").unwrap(), Some(&proxy)).unwrap();
+        assert_eq!(thumbs.fetch("0eD-GQCutAU").await.unwrap(), b"jpeg bytes");
+        assert_eq!(
+            *seen.lock().unwrap(),
+            vec!["http://ytimg.test/vi/0eD-GQCutAU/maxresdefault.jpg".to_owned()]
+        );
     }
 }

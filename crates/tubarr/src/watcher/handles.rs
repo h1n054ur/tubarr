@@ -20,6 +20,7 @@ use url::Url;
 
 use super::is_channel_id;
 use crate::{
+    network::{self, OutboundProxy},
     ratelimit::{Lane, RateLimiter},
     resolver::is_video_id,
 };
@@ -309,12 +310,13 @@ impl ChannelLookup {
         feed_url: &Url,
         limiter: Arc<RateLimiter>,
         throttle_pause: Duration,
+        proxy: Option<&OutboundProxy>,
     ) -> Result<Self, reqwest::Error> {
-        let client = Client::builder()
+        let builder = Client::builder()
             .user_agent(concat!("tubarr/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(Duration::from_secs(15))
-            .timeout(Duration::from_secs(30))
-            .build()?;
+            .timeout(Duration::from_secs(30));
+        let client = network::youtube_client(builder, proxy)?.build()?;
         let mut site = feed_url.clone();
         site.set_path("/");
         site.set_query(None);

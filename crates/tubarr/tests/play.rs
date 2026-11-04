@@ -244,7 +244,7 @@ impl Harness {
             prebuild_retry: Duration::from_millis(20),
             ..PlayConfig::default()
         };
-        let mut state = PlayState::new(resolver, config).unwrap();
+        let mut state = PlayState::new(resolver, config, None).unwrap();
         if let Some(index) = index {
             state = state.with_index_dir(index);
         }

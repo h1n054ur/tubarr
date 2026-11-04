@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use super::ResolveError;
 use crate::{
+    network::OutboundProxy,
     newznab::title::quality_height,
     ratelimit::{Lane, ProcessSlots},
 };
@@ -38,7 +39,15 @@ pub struct YtDlp {
     /// Shared by every clone, so lookups, listings and checks together never run more processes
     /// at once than it allows.
     pub processes: Arc<ProcessSlots>,
+    /// `[network] proxy`: set in the environment of every run (see [`YtDlp::proxy_env`]), so
+    /// lookups, listings, searches and the canary all leave through it.
+    pub proxy: Option<OutboundProxy>,
+    /// Hosts yt-dlp reaches straight, past the proxy, besides loopback: the PO token server.
+    pub direct_hosts: Vec<String>,
 }
+
+/// Always in `NO_PROXY`: local helpers never go through the proxy.
+const DIRECT_HOSTS: [&str; 3] = ["localhost", "127.0.0.1", "::1"];
 
 impl YtDlp {
     /// One process at a time, the default of `rate_limit.processes`.
@@ -48,7 +57,35 @@ impl YtDlp {
             deno: None,
             timeout: Duration::from_secs(60),
             processes: Arc::new(ProcessSlots::new(1)),
+            proxy: None,
+            direct_hosts: Vec::new(),
         }
+    }
+
+    /// The environment that sends a run through `proxy`, empty without one. yt-dlp reads
+    /// `<scheme>_proxy` and `all_proxy` from its environment when it has no `--proxy` (Python's
+    /// `urllib.request.getproxies`), which keeps the URL and its credentials out of the process
+    /// list. `NO_PROXY` keeps loopback and `direct_hosts` (the PO token server) direct.
+    pub fn proxy_env(&self) -> Vec<(String, String)> {
+        let Some(proxy) = &self.proxy else {
+            return Vec::new();
+        };
+        let url = proxy.expose();
+        let mut no_proxy: Vec<&str> = DIRECT_HOSTS.to_vec();
+        for host in &self.direct_hosts {
+            if !no_proxy.contains(&host.as_str()) {
+                no_proxy.push(host);
+            }
+        }
+        let no_proxy = no_proxy.join(",");
+        let mut env = Vec::with_capacity(8);
+        for name in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"] {
+            env.push((name.to_owned(), url.to_owned()));
+            env.push((name.to_lowercase(), url.to_owned()));
+        }
+        env.push(("NO_PROXY".to_owned(), no_proxy.clone()));
+        env.push(("no_proxy".to_owned(), no_proxy));
+        env
     }
 
     /// The arguments for one lookup, with a fallback step's `extra` options before the watch URL.
@@ -84,6 +121,7 @@ impl YtDlp {
         let mut command = tokio::process::Command::new(&self.binary);
         command
             .args(args)
+            .envs(self.proxy_env())
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -113,6 +151,11 @@ impl YtDlp {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
+            // yt-dlp may quote its proxy, credentials and all, when it cannot reach it.
+            let stderr = match &self.proxy {
+                Some(proxy) => proxy.scrub(&stderr),
+                None => stderr.into_owned(),
+            };
             return Err(classify(&stderr, output.status.code()));
         }
         Ok(output.stdout)
@@ -517,6 +560,40 @@ mod tests {
         );
         assert!(args.contains(&"-J".to_owned()));
         assert!(!args.iter().any(|a| a.contains("cookies")));
+    }
+
+    #[test]
+    fn the_proxy_goes_in_the_environment_only() {
+        let mut ytdlp = YtDlp::new("/config/bin/yt-dlp");
+        assert!(ytdlp.proxy_env().is_empty());
+
+        ytdlp.proxy = Some(OutboundProxy::parse("socks5h://u:pw@10.0.0.2:1080").unwrap());
+        ytdlp.direct_hosts = vec!["bgutil".to_owned(), "localhost".to_owned()];
+        let env: BTreeMap<String, String> = ytdlp.proxy_env().into_iter().collect();
+        for name in [
+            "HTTP_PROXY",
+            "http_proxy",
+            "HTTPS_PROXY",
+            "https_proxy",
+            "ALL_PROXY",
+            "all_proxy",
+        ] {
+            assert_eq!(
+                env[name].trim_end_matches('/'),
+                "socks5h://u:pw@10.0.0.2:1080",
+                "{name}"
+            );
+        }
+        assert_eq!(env["NO_PROXY"], "localhost,127.0.0.1,::1,bgutil");
+        assert_eq!(env["no_proxy"], env["NO_PROXY"]);
+        assert_eq!(env.len(), 8);
+
+        let args = ytdlp.args("0eD-GQCutAU", &[]);
+        assert!(!args.iter().any(|a| a == "--proxy" || a.contains("pw@")));
+        // Debug, which the resolver's own Debug includes, never shows the credentials.
+        let debug = format!("{ytdlp:?}");
+        assert!(debug.contains("socks5h://10.0.0.2:1080"), "{debug}");
+        assert!(!debug.contains("u:pw@"), "{debug}");
     }
 
     #[test]

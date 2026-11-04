@@ -148,7 +148,9 @@ pub struct AlternateTitle {
 
 /// An HTTP client with the arr timeouts, for components that build their arr clients per use.
 pub(crate) fn http_client() -> Result<reqwest::Client, reqwest::Error> {
+    // Direct even when the process environment names a proxy: see [`crate::network`].
     reqwest::Client::builder()
+        .no_proxy()
         .timeout(REQUEST_TIMEOUT)
         .connect_timeout(CONNECT_TIMEOUT)
         .build()

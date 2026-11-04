@@ -182,7 +182,7 @@ impl Harness {
             max_streams,
             ..PlayConfig::default()
         };
-        let state = Arc::new(PlayState::new(resolver, config).unwrap());
+        let state = Arc::new(PlayState::new(resolver, config, None).unwrap());
         let addr = spawn(router(state.clone())).await;
         Self {
             _dir: dir,

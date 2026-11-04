@@ -13,6 +13,13 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Tubarr',
+			logo: {
+				light: './src/assets/tubarr-logo-horizontal-light-notagline.svg',
+				dark: './src/assets/tubarr-logo-horizontal-dark-notagline.svg',
+				alt: 'Tubarr',
+				replacesTitle: true,
+			},
+			customCss: ['./src/styles/brand.css'],
 			description: 'YouTube as a source for Sonarr and Radarr, played in Jellyfin without storing a thing.',
 			social: [{ icon: 'github', label: 'GitHub', href: `https://github.com/${owner}/${repo}` }],
 			editLink: { baseUrl: `https://github.com/${owner}/${repo}/edit/main/docs/` },
@@ -31,7 +38,7 @@ export default defineConfig({
 				},
 				{
 					label: 'Operations',
-					items: ['operations/sizing', 'operations/backups-and-upgrades', 'operations/troubleshooting'],
+					items: ['operations/sizing', 'operations/monitoring', 'operations/where-to-run', 'operations/backups-and-upgrades', 'operations/troubleshooting'],
 				},
 				{
 					label: 'Reference',

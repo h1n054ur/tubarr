@@ -119,13 +119,17 @@ async fn setup(feed_url: &str, ytdlp: &std::path::Path) -> Setup {
         rss_spacing: Duration::from_secs(1),
         ..config::Watcher::default()
     };
-    let watcher = Arc::new(Watcher::new(
-        settings,
-        db.clone(),
-        limiter.clone(),
-        YtDlp::new(ytdlp),
-        Duration::from_secs(900),
-    ));
+    let watcher = Arc::new(
+        Watcher::new(
+            settings,
+            db.clone(),
+            limiter.clone(),
+            YtDlp::new(ytdlp),
+            Duration::from_secs(900),
+            None,
+        )
+        .unwrap(),
+    );
     Setup {
         watcher,
         db,
@@ -396,7 +400,9 @@ async fn extra_channels_are_watched_without_a_mapping() {
             s.limiter.clone(),
             YtDlp::new("/nonexistent/yt-dlp"),
             Duration::from_secs(900),
+            None,
         )
+        .unwrap()
         .with_channels(vec![CHANNEL.to_owned()]),
     );
     let task = tokio::spawn(watcher.clone().run());
@@ -431,21 +437,25 @@ async fn a_feed_failing_past_one_interval_falls_back_to_short_listings_until_it_
     let s = setup(&url, &fake.path).await;
     s.db.insert_mapping(&mapping()).await.unwrap();
     let interval = Duration::from_millis(300);
-    let watcher = Arc::new(Watcher::new(
-        config::Watcher {
-            feed_url: url.parse().unwrap(),
-            rss_interval: interval,
-            rss_jitter: Duration::ZERO,
-            rss_spacing: Duration::from_millis(10),
-            // 100 ms apart, so the cap never holds this test up.
-            fallback_per_hour: 36_000,
-            ..config::Watcher::default()
-        },
-        s.db.clone(),
-        s.limiter.clone(),
-        YtDlp::new(&fake.path),
-        Duration::from_secs(900),
-    ));
+    let watcher = Arc::new(
+        Watcher::new(
+            config::Watcher {
+                feed_url: url.parse().unwrap(),
+                rss_interval: interval,
+                rss_jitter: Duration::ZERO,
+                rss_spacing: Duration::from_millis(10),
+                // 100 ms apart, so the cap never holds this test up.
+                fallback_per_hour: 36_000,
+                ..config::Watcher::default()
+            },
+            s.db.clone(),
+            s.limiter.clone(),
+            YtDlp::new(&fake.path),
+            Duration::from_secs(900),
+            None,
+        )
+        .unwrap(),
+    );
     let used = || (3.0 - s.limiter.status().available).round();
 
     // Every feed answers 404. Within the first interval only the feed is tried.

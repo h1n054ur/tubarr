@@ -26,7 +26,7 @@ Tubarr is built for one household. Every play from a friend's Jellyfin client is
 
 ## Why no tips on getting around geo-blocks?
 
-Some videos are blocked in some countries. Tubarr marks them as unplayable and moves on. The project's docs will not explain how to get around regional restrictions, with a VPN or anything else. Those restrictions are often there for rights reasons, and guides to get past them would change what the project is for. Tubarr will keep reporting geo-blocked videos clearly so you know why one did not play.
+Some videos are blocked in some countries. Tubarr marks them as unplayable and moves on. The project's docs will not help anyone get past regional restrictions, with a VPN or anything else. Those restrictions are often there for rights reasons, and guides to get past them would change what the project is for. [Where to run it](../../operations/where-to-run/) is about something else: choosing where Tubarr's own traffic leaves from, for example when it runs on a VPS that YouTube bot-checks. Tubarr will keep reporting geo-blocked videos clearly so you know why one did not play.
 
 ## Does it download videos?
 

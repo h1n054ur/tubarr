@@ -40,7 +40,9 @@ async fn setup(ytdlp: &std::path::Path, settings: config::Watcher) -> Setup {
         limiter.clone(),
         YtDlp::new(ytdlp),
         Duration::from_secs(900),
-    );
+        None,
+    )
+    .unwrap();
     Setup {
         watcher,
         db,

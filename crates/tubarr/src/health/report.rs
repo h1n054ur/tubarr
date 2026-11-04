@@ -64,6 +64,9 @@ pub struct HealthReport {
     pub storage: StorageReport,
     /// First plays building and plays streaming right now.
     pub play: PlayLoad,
+    /// `[network] proxy` as `scheme://host:port`, never with its credentials. Null when YouTube
+    /// traffic goes straight out.
+    pub outbound_proxy: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize)]
@@ -216,6 +219,12 @@ impl HealthReport {
             jellyfin,
             storage: StorageReport { rows, play_index },
             play: state.play.load(),
+            outbound_proxy: state
+                .config
+                .network
+                .proxy
+                .as_ref()
+                .map(|p| p.redacted().to_owned()),
         }
     }
 }

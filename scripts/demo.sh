@@ -2,7 +2,7 @@
 # See the UI on demo data: a debug Tubarr on localhost:8480 with a seeded database, the e2e fake
 # YouTube and fake yt-dlp, a fake Radarr that takes pushes (nothing reaches the internet, no
 # Sonarr or Jellyfin), and the web dev server. Every run starts from an empty .demo/ (git-ignored). Ctrl-C stops everything.
-# See the README section "See the UI on demo data".
+# See "See your change on demo data" in CONTRIBUTING.md.
 #
 #   scripts/demo.sh    # ports from TUBARR_PORT, YT_PORT, ARR_PORT, WEB_PORT (8480, 8482, 8483, 5173)
 set -euo pipefail

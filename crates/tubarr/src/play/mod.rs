@@ -56,6 +56,7 @@ use tokio::sync::{Semaphore, mpsc};
 
 use crate::{
     metrics::METRICS,
+    network::{self, OutboundProxy},
     ratelimit::Lane,
     resolver::{ResolveCache, ResolveError, Resolved, Resolver, StreamFormat},
     store::Db,
@@ -68,6 +69,15 @@ use vfile::{
     BuildError, Fragment, Layout, Parsed, PartIndex, Piece, Track, TrackData, TrackIndex,
     VirtualFile,
 };
+
+/// The client for googlevideo and the caption host. Connections stay open between fragments.
+fn media_client(proxy: Option<&OutboundProxy>) -> Result<reqwest::Client, reqwest::Error> {
+    let builder = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .read_timeout(Duration::from_secs(30))
+        .pool_idle_timeout(Duration::from_secs(90));
+    network::youtube_client(builder, proxy)?.build()
+}
 
 /// Tunables for the play endpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -306,13 +316,13 @@ impl<C> std::fmt::Debug for PlayState<C> {
 }
 
 impl<C: ResolveCache + 'static> PlayState<C> {
-    pub fn new(resolver: Arc<Resolver<C>>, config: PlayConfig) -> Result<Self, reqwest::Error> {
-        // Connections to googlevideo stay open between fragments.
-        let client = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(10))
-            .read_timeout(Duration::from_secs(30))
-            .pool_idle_timeout(Duration::from_secs(90))
-            .build()?;
+    /// `proxy` is `[network] proxy`: the relay's media and caption fetches go through it.
+    pub fn new(
+        resolver: Arc<Resolver<C>>,
+        config: PlayConfig,
+        proxy: Option<&OutboundProxy>,
+    ) -> Result<Self, reqwest::Error> {
+        let client = media_client(proxy)?;
         Ok(Self {
             resolver,
             client,

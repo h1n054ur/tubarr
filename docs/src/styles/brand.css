@@ -1,0 +1,41 @@
+/* Tubarr brand for the docs site. Values come from web/src/brand/tubarr-palette.css and the web UI's
+ * font (Lexend, files in ../fonts). Starlight's dark theme is the default; light uses data-theme. */
+@font-face { font-family: 'Lexend'; font-style: normal; font-weight: 400; font-display: swap; src: url('../fonts/lexend-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Lexend'; font-style: normal; font-weight: 500; font-display: swap; src: url('../fonts/lexend-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Lexend'; font-style: normal; font-weight: 600; font-display: swap; src: url('../fonts/lexend-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Lexend'; font-style: normal; font-weight: 700; font-display: swap; src: url('../fonts/lexend-latin-700-normal.woff2') format('woff2'); }
+
+:root {
+	--sl-font: 'Lexend', ui-sans-serif, system-ui, sans-serif;
+
+	/* dark: --tubarr-* dark tokens */
+	--sl-color-accent-low: #1f2937; /* --tubarr-surface */
+	--sl-color-accent: #ff5a4d; /* --tubarr-primary */
+	--sl-color-accent-high: #ff6e62; /* --tubarr-primary-text */
+	--sl-color-white: #f8fafc; /* --tubarr-text */
+	--sl-color-gray-1: #f8fafc;
+	--sl-color-gray-2: #f8fafc;
+	--sl-color-gray-3: #94a3b8; /* --tubarr-text-secondary */
+	--sl-color-gray-4: #94a3b8;
+	--sl-color-gray-5: #2b3646; /* --tubarr-border */
+	--sl-color-gray-6: #162033; /* --tubarr-surface-2 */
+	--sl-color-black: #0b1220; /* --tubarr-bg */
+	--sl-color-text-invert: #0b1220; /* --tubarr-on-primary */
+}
+
+:root[data-theme='light'] {
+	--sl-color-accent-low: #f1f5f9; /* --tubarr-surface-2 */
+	--sl-color-accent: #ff5a4d; /* --tubarr-primary */
+	--sl-color-accent-high: #c7342a; /* --tubarr-primary-text */
+	--sl-color-text-accent: #c7342a; /* links: 4.5:1 or more on the light surfaces */
+	--sl-color-white: #0b1220; /* --tubarr-text */
+	--sl-color-gray-1: #0b1220;
+	--sl-color-gray-2: #1f2937; /* --tubarr-slate */
+	--sl-color-gray-3: #475569; /* --tubarr-text-secondary */
+	--sl-color-gray-4: #475569;
+	--sl-color-gray-5: #e2e8f0; /* --tubarr-border */
+	--sl-color-gray-6: #f1f5f9; /* --tubarr-surface-2 */
+	--sl-color-gray-7: #f1f5f9;
+	--sl-color-black: #f8fafc; /* --tubarr-bg */
+	--sl-color-text-invert: #0b1220; /* --tubarr-on-primary */
+}

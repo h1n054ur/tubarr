@@ -244,7 +244,7 @@ The JSON body of each notice looks like this:
  "footer": "Tubarr · canary", "at": 1791499315, "username": "Tubarr"}
 ```
 
-`event` is one of `canary_failing`, `canary_recovered`, `cookies_used`, `binary_updated`, `binary_update_failed`, `grabs` and `unmatched`. `tone` is `success`, `failure`, `warning` or `info`, and `at` is Unix seconds. `status`, `text`, `fields` and `lists` are left out when empty. Values such as release names and error messages are sent as they are, so the endpoint should escape them before it shows them. A notice is tried again after a server error or a network error, waits out a 429, and is dropped after any other refusal.
+`event` is one of `canary_failing`, `canary_recovered`, `cookies_used`, `binary_updated`, `binary_update_failed`, `grabs` and `unmatched`. `tone` is `success`, `failure`, `warning` or `info`, and `at` is Unix seconds. `status`, `text`, `fields` and `lists` are left out when empty. Values such as release names and error messages are sent as they are, so the endpoint should escape them before it shows them. A notice is tried again after a server error or a network error, waits out a 429, and is dropped after any other refusal. Each notice gets up to four tries. If 32 are already waiting to be sent, a new one is dropped.
 
 ## `[auth]`
 
@@ -328,7 +328,24 @@ A copy of the database taken before an upgrade changes its layout, so the upgrad
 | `enabled` | true or false | `false` | serve `/metrics` |
 | `token_file` | secret file | unset | the token a scraper sends as `Authorization: Bearer <token>`. Without it the API key from `api_key_file` is the token. With neither, only clients `[auth] play_allowed_networks` lets through may read it |
 
+[Monitoring](../../operations/monitoring/) has a Prometheus scrape config, every metric and some useful queries.
+
 A missing or wrong token answers 401. A client outside the allowed networks, when no token is set, gets 403. The labels never hold video ids, titles or paths.
+
+## `[network]`
+
+An outbound proxy for YouTube traffic, off by default. YouTube often answers cloud and VPS addresses with a bot check, so a host there can send Tubarr's YouTube requests out through a network it is allowed to use instead. When set, every request toward YouTube and Google's video hosts goes through it: yt-dlp gets it in its environment (`HTTPS_PROXY`, `ALL_PROXY` and the like, never on its command line), and so do the channel feeds, channel page lookups, episode thumbnails and the `/play` media and caption fetches. Sonarr, Radarr, Jellyfin, the notify webhook, OpenID Connect sign-in, the drafts lookups (through Sonarr and Radarr, and TVDB and TMDB directly when their keys are set) and the yt-dlp and deno downloads from GitHub never use it.
+
+| Key | Type | Default | What it does |
+|---|---|---|---|
+| `proxy` | URL | unset | the proxy, for example `socks5h://10.0.0.2:1080` or `http://proxy:3128`. `http://`, `https://`, `socks5://` and `socks5h://` work |
+| `proxy_file` | secret file | unset | a file holding the same URL, for a proxy that needs a user name and password, like `socks5h://user:password@10.0.0.2:1080` |
+
+With `socks5://` Tubarr's own requests look up YouTube's host names on this host and hand the proxy an address (yt-dlp treats `socks5://` as `socks5h://` either way). With `socks5h://` the proxy looks them up itself. Use `socks5h://` unless the proxy cannot resolve names.
+
+Set one of the two, not both. A URL that does not parse, or a scheme not in the list, stops Tubarr at start. The user name and password never appear in the log, on the Health page or in error messages: those show only the scheme, host and port. With a proxy set, `GET /api/health` lists it as `outbound_proxy`. yt-dlp still reaches `localhost`, `127.0.0.1`, `::1` and the host of `[fallback] po_token_url` directly.
+
+Tubarr ignores the `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and `NO_PROXY` environment variables (which Docker can set for every container) for Sonarr, Radarr, Jellyfin, the notify webhook, OpenID Connect sign-in and the drafts lookups, so those always go direct. The yt-dlp and deno downloads from GitHub follow those variables, and so does the YouTube traffic while `[network]` is unset.
 
 ## Keys for tests only
 

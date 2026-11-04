@@ -118,7 +118,7 @@ Tubarr follows [semantic versioning](https://semver.org) and stays on 0.x until 
 - a minor release (0.2.0) brings new features, or a breaking change to the config, the APIs or the database. Breaking changes come with an upgrade note in `CHANGELOG.md` saying what to change.
 - a patch release (0.1.1) only fixes things and never needs a config change.
 
-Each release is a git tag `vX.Y.Z`, with its notes in `CHANGELOG.md`. The release workflow builds each release's image for `linux/amd64` and `linux/arm64` and tags it:
+Each release is a signed git tag `vX.Y.Z` on `main`, with its notes in `CHANGELOG.md` (Keep a Changelog format). The release workflow builds each release's image for `linux/amd64` and `linux/arm64` and tags it:
 
 | Tag | What it follows |
 |---|---|
@@ -128,9 +128,9 @@ Each release is a git tag `vX.Y.Z`, with its notes in `CHANGELOG.md`. The releas
 
 Pin `X.Y` to get fixes without surprises, or `X.Y.Z` to stay on one build.
 
-On start Tubarr downloads the yt-dlp and deno builds for the machine it runs on, x86_64 or arm64. On any other architecture there is no managed copy: install both yourself and point `[binaries] yt_dlp` and `deno` at them.
+On start Tubarr downloads the yt-dlp and deno builds for the machine it runs on (`yt-dlp_linux` or `yt-dlp_linux_aarch64`, `deno-x86_64-unknown-linux-gnu` or `deno-aarch64-unknown-linux-gnu`), each checked against the SHA-256 sums its release publishes. On any other architecture there is no managed copy: install both yourself and point `[binaries] yt_dlp` and `deno` at them.
 
-The running version and the commit it was built from show at the top of the Health page, and in `/api/health` under `version`.
+The running version and the commit it was built from show at the top of the Health page, and in `/api/health` under `version`. The commit is filled in by the image build (`TUBARR_GIT_SHA`), and a plain `cargo build` reports none.
 
 ## yt-dlp and deno
 

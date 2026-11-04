@@ -21,6 +21,7 @@ use crate::{
     channels::{self, ChannelInfo, Channels},
     drafts::{DraftSettings, Drafts},
     matcher::FilmSettings,
+    network::OutboundProxy,
     play::{MAX_HEAD_BYTES, PlayConfig},
     ratelimit::RateLimitConfig,
     resolver::{self, CachePolicy},
@@ -117,6 +118,50 @@ pub struct Config {
     pub backup: BackupPolicy,
     /// The Prometheus endpoint (`[metrics]`).
     pub metrics: MetricsConfig,
+    /// The outbound proxy for YouTube traffic (`[network]`).
+    pub network: Network,
+}
+
+/// The `[network]` section as written.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields, default)]
+struct NetworkFile {
+    /// The proxy URL itself, e.g. `socks5h://10.0.0.2:1080`.
+    proxy: Option<String>,
+    /// A file holding the proxy URL, so a user name and password stay out of the config.
+    proxy_file: Option<PathBuf>,
+}
+
+/// The `[network]` section, checked.
+#[derive(Debug, Clone, Default)]
+pub struct Network {
+    /// Every request toward YouTube and Google's video hosts goes through it. `None` sends them
+    /// straight out, as before the setting existed.
+    pub proxy: Option<OutboundProxy>,
+}
+
+impl NetworkFile {
+    fn check(self) -> Result<Network, ConfigError> {
+        let (key, raw) = match (self.proxy, self.proxy_file) {
+            (None, None) => return Ok(Network::default()),
+            (Some(_), Some(_)) => {
+                return Err(invalid(
+                    "network",
+                    "set either proxy or proxy_file, not both",
+                ));
+            }
+            (Some(raw), None) => ("network.proxy", raw),
+            (None, Some(path)) => {
+                let secret = read_secret("network.proxy_file", &path)?;
+                ("network.proxy_file", secret.expose().to_owned())
+            }
+        };
+        let proxy = OutboundProxy::parse(&raw).map_err(|e| ConfigError::Invalid {
+            key,
+            reason: e.to_string(),
+        })?;
+        Ok(Network { proxy: Some(proxy) })
+    }
 }
 
 /// The `[metrics]` section as written.
@@ -685,10 +730,13 @@ pub enum ConfigError {
         path: String,
         source: std::io::Error,
     },
-    #[error("invalid config file {path}: {source}")]
+    /// Never quotes the file: the line at fault may hold a password or an API key.
+    #[error("invalid config file {path}: {at}{message}")]
     Parse {
         path: String,
-        source: toml::de::Error,
+        /// `line L, column C, key `a.b`: ` as far as known, or empty.
+        at: String,
+        message: String,
     },
     #[error("config key `{key}`: {reason}")]
     Invalid { key: &'static str, reason: String },
@@ -698,6 +746,46 @@ pub enum ConfigError {
         path: String,
         source: std::io::Error,
     },
+}
+
+/// A parse error with where it happened and what went wrong, but none of the source text: the
+/// toml crate's own `Display` and `Debug` quote the line at fault, and serde's messages quote a
+/// string value of the wrong type.
+fn parse_error(text: &str, shown: &str, source: &toml::de::Error) -> ConfigError {
+    let mut at = String::new();
+    if let Some(span) = source.span() {
+        let before = &text.as_bytes()[..span.start.min(text.len())];
+        let line = before.iter().filter(|&&b| b == b'\n').count() + 1;
+        let line_start = before
+            .iter()
+            .rposition(|&b| b == b'\n')
+            .map_or(0, |i| i + 1);
+        let column = String::from_utf8_lossy(&before[line_start..])
+            .chars()
+            .count()
+            + 1;
+        at.push_str(&format!("line {line}, column {column}, "));
+    }
+    // Without its input the error shows only its message and the key path, as `in `a.b``.
+    let mut bare = source.clone();
+    bare.set_input(None);
+    let key = bare
+        .to_string()
+        .lines()
+        .find_map(|l| l.strip_prefix("in `")?.strip_suffix('`').map(str::to_owned));
+    if let Some(key) = key {
+        at.push_str(&format!("key `{key}`, "));
+    }
+    if let Some(stripped) = at.strip_suffix(", ") {
+        at = format!("{stripped}: ");
+    }
+    let quoted = regex::Regex::new(r#""(?:[^"\\]|\\.)*""#).expect("a fixed pattern");
+    let message = quoted.replace_all(source.message(), "\"***\"").into_owned();
+    ConfigError::Parse {
+        path: shown.to_owned(),
+        at,
+        message,
+    }
 }
 
 /// The file as written. Every field but `public_url` has a default.
@@ -736,6 +824,7 @@ struct ConfigFile {
     jellyfin: Option<JellyfinFile>,
     backup: BackupPolicy,
     metrics: MetricsFile,
+    network: NetworkFile,
 }
 
 impl Default for ConfigFile {
@@ -773,6 +862,7 @@ impl Default for ConfigFile {
             jellyfin: None,
             backup: BackupPolicy::default(),
             metrics: MetricsFile::default(),
+            network: NetworkFile::default(),
         }
     }
 }
@@ -851,6 +941,22 @@ impl Config {
             .unwrap_or_else(|| self.complete_dir.join(".play-index"))
     }
 
+    /// Hosts yt-dlp reaches past `[network] proxy`, besides loopback: the PO token server of
+    /// `[fallback] po_token_url`, which runs next to Tubarr.
+    pub fn ytdlp_direct_hosts(&self) -> Vec<String> {
+        self.fallback
+            .po_token_url
+            .as_ref()
+            .and_then(Url::host_str)
+            .map(|host| {
+                host.trim_start_matches('[')
+                    .trim_end_matches(']')
+                    .to_owned()
+            })
+            .into_iter()
+            .collect()
+    }
+
     /// The resolver's fallback steps.
     pub fn fallback_steps(&self) -> resolver::Fallback {
         resolver::Fallback {
@@ -869,10 +975,8 @@ impl Config {
     }
 
     fn parse(text: &str, shown: &str) -> Result<Self, ConfigError> {
-        let file: ConfigFile = toml::from_str(text).map_err(|source| ConfigError::Parse {
-            path: shown.to_owned(),
-            source,
-        })?;
+        let file: ConfigFile =
+            toml::from_str(text).map_err(|source| parse_error(text, shown, &source))?;
         file.check()
     }
 }
@@ -1083,6 +1187,8 @@ impl ConfigFile {
                 .transpose()?,
         };
 
+        let network = self.network.check()?;
+
         Ok(Config {
             listen: self.listen,
             public_url,
@@ -1114,6 +1220,7 @@ impl ConfigFile {
             jellyfin,
             backup: self.backup,
             metrics,
+            network,
         })
     }
 }
@@ -2114,5 +2221,129 @@ mod tests {
             let text = error_text(&toml);
             assert!(text.contains(&format!("`{key}`")), "{toml}: {text}");
         }
+    }
+
+    #[test]
+    fn network_proxy_is_off_by_default() {
+        let config = Config::from_toml(MINIMAL).unwrap();
+        assert!(config.network.proxy.is_none());
+        let config = Config::from_toml(&format!("{MINIMAL}[network]\n")).unwrap();
+        assert!(config.network.proxy.is_none());
+    }
+
+    #[test]
+    fn network_proxy_inline_and_from_a_file() {
+        let config = Config::from_toml(&format!(
+            "{MINIMAL}[network]\nproxy = \"socks5h://gw:1080\"\n"
+        ))
+        .unwrap();
+        let proxy = config.network.proxy.unwrap();
+        assert_eq!(proxy.redacted(), "socks5h://gw:1080");
+
+        let file = secret_file("http://alice:hunter2@10.0.0.2:3128\n");
+        let config = Config::from_toml(&format!(
+            "{MINIMAL}[network]\nproxy_file = {:?}\n",
+            file.path()
+        ))
+        .unwrap();
+        let proxy = config.network.proxy.clone().unwrap();
+        assert_eq!(proxy.redacted(), "http://10.0.0.2:3128");
+        assert!(proxy.expose().starts_with("http://alice:hunter2@"));
+        let debug = format!("{:?}", config.network);
+        assert!(
+            !debug.contains("hunter2") && !debug.contains("alice"),
+            "{debug}"
+        );
+    }
+
+    #[test]
+    fn network_proxy_errors() {
+        let file = secret_file("socks5://gw:1080");
+        let both = error_text(&format!(
+            "[network]\nproxy = \"socks5://gw:1080\"\nproxy_file = {:?}\n",
+            file.path()
+        ));
+        assert!(
+            both.contains("`network`") && both.contains("not both"),
+            "{both}"
+        );
+
+        let scheme = error_text("[network]\nproxy = \"ftp://alice:hunter2@gw:21\"\n");
+        assert!(scheme.contains("`network.proxy`"), "{scheme}");
+        assert!(scheme.contains("`ftp` is not supported"), "{scheme}");
+        assert!(!scheme.contains("hunter2"), "{scheme}");
+
+        let malformed = error_text("[network]\nproxy = \"not a url\"\n");
+        assert!(malformed.contains("`network.proxy`"), "{malformed}");
+        assert!(malformed.contains("not a valid URL"), "{malformed}");
+
+        let bad_file = secret_file("gopher://alice:hunter2@gw");
+        let from_file = error_text(&format!("[network]\nproxy_file = {:?}\n", bad_file.path()));
+        assert!(from_file.contains("`network.proxy_file`"), "{from_file}");
+        assert!(!from_file.contains("hunter2"), "{from_file}");
+
+        let missing = error_text("[network]\nproxy_file = \"/nonexistent/tubarr-proxy\"\n");
+        assert!(missing.contains("`network.proxy_file`"), "{missing}");
+
+        let unknown = error_text("[network]\nproxies = \"x\"\n");
+        assert!(unknown.contains("proxies"), "{unknown}");
+    }
+
+    #[test]
+    fn parse_errors_never_quote_the_file() {
+        const SECRET: &str = "hunter2-not-real";
+        for (toml, key, line) in [
+            (
+                format!("[network]\nproxi = \"http://alice:{SECRET}@gw:3128\"\n"),
+                Some("network"),
+                3,
+            ),
+            (
+                format!("[sonarr]\nurl = \"http://sonarr:8989\"\napi_key = \"{SECRET}\"\n"),
+                Some("sonarr"),
+                4,
+            ),
+            (
+                format!("[rate_limit]\nprocesses = \"{SECRET}\"\n"),
+                Some("rate_limit.processes"),
+                3,
+            ),
+            (
+                format!("[network]\nproxy = \"http://alice:{SECRET}@gw:3128\n"),
+                None,
+                3,
+            ),
+        ] {
+            let err = Config::from_toml(&format!("{MINIMAL}{toml}")).unwrap_err();
+            let text = err.to_string();
+            let debug = format!("{err:?}");
+            for shown in [&text, &debug] {
+                assert!(!shown.contains(SECRET), "{shown}");
+                assert!(!shown.contains("alice"), "{shown}");
+            }
+            assert!(
+                text.starts_with("invalid config file (inline): line "),
+                "{text}"
+            );
+            assert!(text.contains(&format!("line {line}, column ")), "{text}");
+            if let Some(key) = key {
+                assert!(text.contains(&format!("key `{key}`")), "{text}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_po_token_host_stays_direct() {
+        assert!(
+            Config::from_toml(MINIMAL)
+                .unwrap()
+                .ytdlp_direct_hosts()
+                .is_empty()
+        );
+        let config = Config::from_toml(&format!(
+            "{MINIMAL}[fallback]\npo_token_url = \"http://bgutil:4416\"\n"
+        ))
+        .unwrap();
+        assert_eq!(config.ytdlp_direct_hosts(), vec!["bgutil".to_owned()]);
     }
 }

@@ -19,6 +19,7 @@ pub mod housekeeping;
 pub mod jellyfin;
 pub mod matcher;
 pub mod metrics;
+pub mod network;
 pub mod newznab;
 pub mod notify;
 pub mod play;
@@ -32,7 +33,7 @@ pub mod watcher;
 
 use std::sync::Arc;
 
-/// The running version, from the crate version. See "Versions and releases" in the README.
+/// The running version, from the crate version. See "Versions" in docs/src/content/docs/operations/backups-and-upgrades.md.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The commit the binary was built from, when the build passed one in (the image build does).
 pub const GIT_SHA: Option<&str> = option_env!("TUBARR_BUILD_SHA");
@@ -113,7 +114,12 @@ impl AppState {
             deno: Some(binaries.path(Tool::Deno)),
             timeout: config.lookup_timeout,
             processes: Arc::new(ProcessSlots::new(config.rate_limit.processes)),
+            proxy: config.network.proxy.clone(),
+            direct_hosts: config.ytdlp_direct_hosts(),
         };
+        // Only the YouTube side gets it: the arrs, Jellyfin, notifications, sign-in and the
+        // binary downloads keep going straight out.
+        let proxy = config.network.proxy.as_ref();
         let arrs = ArrConnections::from_config(&config);
         let wake = Arc::new(tokio::sync::Notify::new());
         let watcher = Watcher::new(
@@ -122,7 +128,8 @@ impl AppState {
             limiter.clone(),
             ytdlp.clone(),
             config.rate_limit.throttle_pause,
-        )
+            proxy,
+        )?
         .with_found(wake.clone())
         .with_channels(config.films.channels.clone())
         .with_listing_sizes(config.channels.listing_sizes());
@@ -130,6 +137,7 @@ impl AppState {
             &config.watcher.feed_url,
             limiter.clone(),
             config.rate_limit.throttle_pause,
+            proxy,
         )?);
         let resolver = Resolver::new(ytdlp, limiter.clone(), db.clone())
             .with_policy(config.cache_policy())
@@ -139,7 +147,7 @@ impl AppState {
         let resolver = Arc::new(resolver);
         let health = Arc::new(Health::new(config.canary.clone(), events));
         let play = Arc::new(
-            PlayState::new(resolver.clone(), config.play_config())?
+            PlayState::new(resolver.clone(), config.play_config(), proxy)?
                 .with_index_dir(config.play_index_dir())
                 .with_prebuild_store(db.clone())
                 .with_release_check(db.clone()),
@@ -192,7 +200,7 @@ impl AppState {
             .clone()
             .map(|j| Jellyfin::new(j, db.clone()).map(Arc::new))
             .transpose()?;
-        let thumbs = Arc::new(Thumbs::new(config.hooks.thumbnail_url.clone())?);
+        let thumbs = Arc::new(Thumbs::new(config.hooks.thumbnail_url.clone(), proxy)?);
         Ok(Self {
             config: Arc::new(config),
             db,

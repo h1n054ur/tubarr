@@ -134,7 +134,7 @@ A new pin for the same episode replaces the old one. A pin or an unpin wakes the
 
 ## Drafts
 
-The helper for titles TheTVDB or TMDB do not have yet. It drafts the entry from what the watcher knows about the channel, and never posts anything anywhere.
+The helper for titles TheTVDB or TMDB do not have yet. It drafts the entry from what the watcher knows about the channel, laid out in the order of the site's add form, and never posts anything anywhere. It costs no YouTube lookups: the checks are read-only searches on TheTVDB or TMDB.
 
 | Call | What it does |
 |---|---|
@@ -166,6 +166,22 @@ These are under `/auth` and need no key. Every `POST` must send `X-Requested-Wit
 | `POST /auth/password` | `{current_password, new_password}`: ends the user's other sessions |
 | `GET /auth/oidc/start?next=/path` | sends the browser to the OpenID Connect provider. `next` must be a path on this site |
 | `GET /auth/oidc/callback` | where the provider sends the browser back |
+
+## Sign-in and response headers
+
+Sign-in is a username and password (argon2id), OpenID Connect (authorization code with PKCE, for Authentik, Keycloak and the like), or both (`[auth] method` is `forms`, `oidc` or `forms+oidc`). With OIDC, `allowed_groups` limits who gets in and new users can be created on their first sign-in. Each user can have a password, an SSO identity or both.
+
+Sessions are `HttpOnly`, `SameSite=Lax` cookies, `Secure` when the UI URL (`[auth] ui_url`, else `public_url`) is https or `[auth] cookie_secure = true`, and only a SHA-256 of each is stored.
+
+Failed logins are counted three ways:
+
+- After five failures from one address, that address waits before it may try any username again, and the wait doubles with each further failure up to 15 minutes.
+- Failures for one username from one address block that pair the same way, but never the same username from other addresses, so nobody can lock an account out by failing on purpose.
+- Failures for one username from all addresses together only slow its sign-ins: past 20, each sign-in for that name is held for a moment before the answer, at most 4 seconds, and never refused.
+
+Counters live in memory and fade after an hour without failures. The client address here is the same one `/play` and `local_bypass` use, so behind a trusted proxy each real client is counted on its own.
+
+Every response except `/play` carries `Content-Security-Policy` (same-origin scripts, styles, fonts, images and API calls only, since the UI bundles its Lexend font and loads nothing from another host, and `frame-ancestors 'none'`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and a `Permissions-Policy` that turns off camera, microphone, location, payment and USB. `/play` responses carry only `nosniff`, since players fetch them as plain media. `/api` for Sonarr and Radarr keeps its `apikey`. `/play` takes no credentials since Jellyfin fetches it as a plain URL: see [Who may fetch /play](../../setup/jellyfin/#who-may-fetch-play).
 
 ## Other endpoints
 

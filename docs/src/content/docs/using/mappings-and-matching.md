@@ -5,6 +5,15 @@ description: What a mapping is, the rules it carries, and how Tubarr decides whi
 
 A mapping is Tubarr's record of one show, daily show or film. It ties a title in Sonarr or Radarr to the YouTube channels that publish it, and carries the rules the matcher uses to pick the right upload for each episode. The Shows and films page lists them all, with how many releases and unmatched notes each one has. Click a row to open its drawer, where the rules are edited.
 
+## How it fits together
+
+1. Tag a series in Sonarr or a film in Radarr with `youtube` (`[arr] tag`). The arr sync reads the tagged titles at start and every `sync_interval`, and keeps one mapping per title, with Sonarr's alternate titles as aliases.
+2. The watcher finds uploads on each mapping's official channels (see [Finding uploads](#finding-uploads)).
+3. The matcher decides which upload is which episode or film and writes releases. Everything it looked at but did not release goes to the Unmatched page with a reason.
+4. Tubarr pushes each new release to the arr that wants it (see [How releases reach the arr](../../setup/sonarr-and-radarr/#how-releases-reach-the-arr)). The arr runs its usual checks and grabs it from Tubarr's SABnzbd API.
+5. The grab writes `<release>.strm`, holding `<public_url>/play/<video id>`, and the captions next to it, then reports the job as completed at once. The arr imports both into its library folder.
+6. Jellyfin opens the `.strm` and reads `/play`, which Tubarr serves from YouTube's DASH files as Jellyfin asks for each byte range (see [How the file is built](../../setup/jellyfin/#how-the-file-is-built)).
+
 ## Where mappings come from
 
 Most mappings come from the arr sync. Tubarr reads every series and film tagged `youtube` (`[arr] tag`) in Sonarr and Radarr at start and then every 15 minutes, and keeps one mapping per title. The title, its kind, its year and its TVDB or TMDB id belong to the arr: Tubarr copies them and never changes them. Everything else on the mapping is yours to set.
@@ -117,6 +126,14 @@ A film is matched on its own channels and on `[films] channels`. Tubarr strips t
 
 A dubbed upload carries the dub's language in its release name, taken from the title (`Hindi Dubbed`).
 
+## Videos that cannot play
+
+Each matcher run spends its leftover lookup budget on videos released at an assumed height, so a video that is gone, private or blocked leaves the feed before an arr grabs it. Tubarr serves only H.264 video (1080p, else 720p, else 480p) with AAC audio, never VP9 or AV1, and the release name carries the height it serves.
+
+A new upload that YouTube offers only in VP9 or AV1 for now is marked unplayable and looked up again every six hours from the same budget, and released once H.264 shows up. A grab of a video that turns out to be unplayable writes nothing and lands in the arr's history as Failed, so the arr blocklists the release and looks for another.
+
+[`GET /admin/api/unplayable`](../../reference/admin-api/#playability) lists those videos, and `DELETE /admin/api/unplayable/{video_id}` lets the matcher try one again. `GET /admin/api/releases/check` lists releases, imported ones included, whose video is unplayable or was never looked up, so dead `.strm` files can be found and cleaned up.
+
 ## Test against channel
 
 The **Test against channel** button in the drawer runs the title rules over every video Tubarr already knows on the mapping's channels, with any edits you have not saved yet, and shows a verdict for each one:
@@ -135,18 +152,25 @@ The same test is `POST /admin/api/mappings/{id}/test` in the [Admin API](../../r
 
 ## Finding uploads
 
-Tubarr only matches videos it has seen. It sees them in four ways:
+Tubarr only matches videos it has seen, and it sees them in four ways. Every way except the feed is one yt-dlp lookup on the shared `[rate_limit]` budget, waits while lookups are paused after a 429 or bot check, and is spread out over time.
 
-| Source | How often | YouTube lookups |
+| Source | When | Lookups |
 |---|---|---|
-| The channel's RSS feed | every 30 minutes | none, it is a plain feed of the newest 15 uploads |
-| The channel's upload list | once a day | 1 per channel, the newest 100 uploads (`listing_size`) |
-| An official playlist named by a show | once a day | 1 per playlist |
-| A channel search for a show without a playlist | when the show is mapped or its channels or aliases change, then daily for up to 14 days (`[watcher] backfill_days`) until every wanted episode is out | 1 per channel and name a day |
+| RSS feed per channel | every 30 minutes | none, it is a plain HTTP feed of the newest 15 uploads |
+| Channel list | once a day per channel | 1 per channel, reads the newest `listing_size` uploads (100 by default) |
+| Short channel list while its feed fails | about every 30 minutes per channel, once the feed has failed for longer than that, until a feed read works again | 1 per channel and turn, reads the newest `fallback_listing_size` (15) uploads, at most `fallback_per_hour` (30) an hour across all channels, spaced evenly |
+| Official playlist named by a show | once a day per playlist | 1 per playlist, up to 500 videos |
+| Channel search for a show without a playlist | at once when the show is mapped, made active again, or its channels, aliases or backfill limit change, then once a day until every wanted episode (or every back episode its limit keeps) is released or `backfill_days` pass. Never with a limit of 0 | 1 per channel and name (the title and up to 2 aliases) per day, 2 when a search comes back full (`backfill_size` results) and a second one for "<name> Episode" follows |
 
-A busy channel pushes a show out of its newest 100 uploads within days, so older shows and back episodes are found by a playlist or the search. When a channel's feed keeps failing, a short upload list stands in for it until the feed works again, and the Health page marks the channel.
+YouTube sometimes answers every channel feed with 404 or 500 for hours, mostly to datacenter addresses. The short lists keep new uploads coming in at about the feed's pace meanwhile, and the Health page marks each channel on them ("feed failing, using listing") with a count above the Watcher table. With more failing channels than the hourly cap allows, each gets its turn less often.
+
+A busy channel (ARY Digital posts dozens of videos a day) pushes a show out of its newest 100 uploads within days, so an older show or its back episodes are found only through a playlist or the search. A typical show on one channel with one alias costs 2 lookups a day for at most 14 days, and none after every episode is out. A search that fails for a passing reason is tried once more after an hour, and the Health page lists each show's backfill. A channel that posts many short clips tagged with the show's name can fill a whole search with them, so the full episodes fall past the results read. A full search is therefore followed by one for "<name> Episode", which ranks the episodes first. Raise a channel's own `listing_size` instead when the gap is only a few weeks: that costs nothing extra, since it is one list per day either way, but a longer list takes longer to read.
+
+Newest, for the back episode limit, goes by the episode itself: its TheTVDB air date, then its season and episode, so a channel list that dates a dozen uploads the same rough "1 month ago" never changes which ones are kept. Only an upload with no episode yet goes by its upload date at match time. A release a capped episode already had is taken back.
 
 ## How a run works
+
+The checks for each video on a mapping's channels run in this order: an extra word in the title (see Excludes) or an upload under the minimum length leaves it out with a reason. Then the title must name the show and exactly one episode, or it is noted as unsure. Of what is left, the best upload per episode is released. A [pin](../pins-and-unmatched/) on the Unmatched page replaces that choice.
 
 The matcher runs after each watcher find, each arr sync, each pin and at least every 30 minutes. Each run is a full recompute for each mapping, so running it twice changes nothing. A mapping whose inputs have not changed since its last run (rules, aliases, pins, Sonarr's episodes, the videos on its channels, its releases and notes) is skipped.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end check: real Sonarr and Radarr in throwaway containers, the release Tubarr binary and
-# a fake YouTube in a third container on the same network (no network to YouTube). See the README section "End-to-end check".
+# a fake YouTube in a third container on the same network (no network to YouTube). See "End-to-end check" in CONTRIBUTING.md.
 #
 #   e2e/run.sh [evidence_dir]     # KEEP=1 leaves everything running for a look, then e2e/run.sh down
 set -euo pipefail

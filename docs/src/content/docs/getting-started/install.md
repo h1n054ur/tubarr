@@ -97,7 +97,7 @@ services:
     # stream, and a lookup alone peaks near 475 MiB, so 512m is too small. 1g leaves room for a
     # full fragment cache on top. Raise it by about 400 MiB for each [rate_limit] processes over 1,
     # by as much as you raise [play] fragment_cache_bytes over its 96 MiB default, and by about
-    # 65 MiB for each [play] max_streams over 8. See "Sizing" in the README.
+    # 65 MiB for each [play] max_streams over 8. See the Sizing page.
     mem_limit: 1g
     # The image has the same check built in. It is repeated here so it is easy to tune.
     healthcheck:

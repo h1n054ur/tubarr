@@ -162,6 +162,7 @@ fn same_id(a: &str, b: &str) -> bool {
 impl Jellyfin {
     pub fn new(config: JellyfinConfig, db: Db) -> Result<Self, reqwest::Error> {
         let http = reqwest::Client::builder()
+            .no_proxy()
             .timeout(Duration::from_secs(60))
             .build()?;
         let user = Mutex::new(config.user_id.clone());

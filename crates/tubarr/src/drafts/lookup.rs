@@ -109,6 +109,7 @@ impl From<reqwest::Error> for LookupError {
 /// Builds the client both sources share.
 pub fn client() -> Result<Client, reqwest::Error> {
     Client::builder()
+        .no_proxy()
         .timeout(Duration::from_secs(30))
         .user_agent(concat!("tubarr/", env!("CARGO_PKG_VERSION")))
         .build()

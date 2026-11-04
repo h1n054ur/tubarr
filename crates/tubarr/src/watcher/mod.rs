@@ -36,6 +36,7 @@ use self::{
 };
 use crate::{
     config,
+    network::{self, OutboundProxy},
     ratelimit::{Lane, RateLimiter},
     resolver::{ResolveError, YtDlp},
     store::{Availability, Db, SHORT, SeenVideo, StoreError, VideoSource, unix_now},
@@ -139,6 +140,15 @@ pub struct Watcher {
     listing_sizes: HashMap<String, u32>,
 }
 
+/// The client for the channel feeds.
+fn feed_client(proxy: Option<&OutboundProxy>) -> Result<Client, reqwest::Error> {
+    let builder = Client::builder()
+        .user_agent(concat!("tubarr/", env!("CARGO_PKG_VERSION")))
+        .connect_timeout(Duration::from_secs(15))
+        .timeout(Duration::from_secs(30));
+    network::youtube_client(builder, proxy)?.build()
+}
+
 impl Watcher {
     pub fn new(
         settings: config::Watcher,
@@ -146,15 +156,11 @@ impl Watcher {
         limiter: Arc<RateLimiter>,
         ytdlp: YtDlp,
         throttle_pause: Duration,
-    ) -> Self {
-        let client = Client::builder()
-            .user_agent(concat!("tubarr/", env!("CARGO_PKG_VERSION")))
-            .connect_timeout(Duration::from_secs(15))
-            .timeout(Duration::from_secs(30))
-            .build()
-            // Only fails when the TLS backend cannot start, which no request could survive anyway.
-            .unwrap_or_default();
-        Self {
+        proxy: Option<&OutboundProxy>,
+    ) -> Result<Self, reqwest::Error> {
+        // `proxy` is `[network] proxy`, for the feed reads. yt-dlp gets it through its environment.
+        let client = feed_client(proxy)?;
+        Ok(Self {
             settings,
             db,
             limiter,
@@ -167,7 +173,7 @@ impl Watcher {
             found: None,
             extra_channels: Vec::new(),
             listing_sizes: HashMap::new(),
-        }
+        })
     }
 
     /// Also watches `channels`, whether or not a mapping names them.

@@ -93,7 +93,7 @@ Releases are named the way scene releases are, so the arrs parse them without cu
 - `Show.Name.2026.10.14.720p.WEB-DL.AAC2.0.H.264.URDU-TUBARR` for a daily show
 - `Theri.2016.1080p.WEB-DL.AAC2.0.H.264.HINDI-TUBARR` for a film
 
-The resolution is the standard tier for the frame (a cinematic 1920x804 is `1080p`), and Tubarr serves 1080p at most. The quality is always WEB-DL.
+The resolution is the standard tier for the frame, since the arrs know only the standard labels and read anything else (`804p`) as 480p: a cinematic 1920x804 or a 4:3 1440x1080 is `1080p`, 1280x536 is `720p`, and a portrait frame is tiered by its long and short sides. Tubarr serves 1080p at most, and the quality is always WEB-DL. A video with a known duration is released at once under `assumed_height` and renamed (same guid) when a lookup gives the real frame size. Films keep the arr's language: their dubs come from title words per release. Which language tag a show gets is explained under [Language](../../using/mappings-and-matching/#language).
 
 **Sonarr.** Any profile that allows WEB-DL at the heights Tubarr serves works, for example the built-in `Any` or `HD-1080p`. Sonarr has no Urdu, so it reads `URDU` as an unknown word and falls back to the series language. Nothing is rejected for it.
 
@@ -123,7 +123,7 @@ Add the series or film as usual, monitored, with the `youtube` tag and the profi
 
 The arrs' RSS sync reads only an indexer's newest releases. A back episode found by a search or a playlist, or a film added without a search, would never be grabbed on its own, and an arr search asks every indexer it has. So Tubarr does not wait for the arr: with `[arr] auto_push` on (the default) it hands each episode or film it releases for the first time to the arr through the arr's release push API.
 
-A push goes out only while the arr has the episode or film monitored and without a file. It carries Tubarr's indexer name and is pinned to the Tubarr download client. The arr then runs its usual checks (quality, profile, delay) and grabs it or not. Pushes go out one at a time, at most one per `push_interval` (5 seconds) per arr. A push the arr could not take because it was down, or answered with a 5xx or 429, is tried again later.
+A push (`POST /api/v3/release/push` on the arr) goes out only while the arr has the episode or film monitored and without a file. It carries the same title and NZB link as Tubarr's feed, Tubarr's indexer name (`[arr] indexer`), and the id of the enabled Usenet download client named `[arr] download_client`, so the arr cannot send it to another client. Without that client nothing is pushed, and pushing needs `api_key_file`, since the NZB links carry the key. The arr then runs its usual checks (quality, profile, delay) and grabs it or not. Pushes go out one at a time, at most one per `push_interval` (5 seconds) per arr. A push the arr could not take because it was down, or answered with a 5xx or 429, is tried again later. Any other failure is dropped.
 
 Tubarr's Activity page lists each push as grabbed, pending, rejected (with the arr's reasons) or failed. Its **Push released** button is the catch-up: it queues every episode and film Tubarr has a release for, and skips what the arr already has or does not monitor.
 
@@ -164,7 +164,7 @@ sonarr_token_file = "/run/secrets/sonarr_hook_token"
 library_paths = [["/mnt/media", "/media"]]   # [as Sonarr sees it, as Tubarr sees it]
 ```
 
-Tubarr needs the media library mounted read-write, and `library_paths` maps the paths Sonarr reports onto Tubarr's mount. A path under none of the pairs is refused and nothing changes. Tubarr only ever removes or overwrites a file that holds one of its own links.
+Tubarr needs the media library mounted read-write, and `library_paths` maps the paths Sonarr reports onto Tubarr's mount. A path under none of the pairs, or one with `..` in it, is refused with a 400 and nothing changes. Tubarr only ever removes or overwrites a file that holds one of its own links.
 
 Then in Sonarr, Settings > Connect > + > Webhook:
 

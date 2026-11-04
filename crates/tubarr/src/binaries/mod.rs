@@ -226,6 +226,8 @@ pub struct BinaryManager {
 
 impl BinaryManager {
     pub fn new(config: Settings) -> Result<Self, BinaryError> {
+        // The one client that still follows `HTTPS_PROXY` and the like from the environment:
+        // GitHub may sit behind a site's own proxy. `[network] proxy` is not used here.
         let client = Client::builder()
             .user_agent(concat!("tubarr/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(Duration::from_secs(15))

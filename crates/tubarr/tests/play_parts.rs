@@ -213,7 +213,7 @@ impl Harness {
             max_jitter: Duration::ZERO,
         }));
         let resolver = Arc::new(Resolver::new(YtDlp::new(path), limiter, MemoryCache::new()));
-        let state = Arc::new(PlayState::new(resolver, PlayConfig::default()).unwrap());
+        let state = Arc::new(PlayState::new(resolver, PlayConfig::default(), None).unwrap());
         let addr = spawn(router(state)).await;
         Self {
             dir,

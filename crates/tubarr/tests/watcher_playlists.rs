@@ -50,7 +50,9 @@ async fn setup(ytdlp: &std::path::Path) -> Setup {
         limiter.clone(),
         YtDlp::new(ytdlp),
         Duration::from_secs(900),
+        None,
     )
+    .unwrap()
     .with_found(found.clone());
     Setup {
         watcher: Arc::new(watcher),
@@ -137,7 +139,9 @@ async fn a_playlist_listing_keeps_the_order_and_feeds_the_matcher() {
         s.limiter.clone(),
         YtDlp::new(&fake.path),
         Duration::from_secs(900),
-    );
+        None,
+    )
+    .unwrap();
     assert_eq!(
         s2.list_playlist(PLAYLIST).await.unwrap(),
         ListingRun { seen: 2, new: 0 }
@@ -206,7 +210,9 @@ async fn a_turn_holds_off_while_lookups_are_paused() {
         fresh,
         YtDlp::new(&fake.path),
         Duration::from_secs(900),
-    );
+        None,
+    )
+    .unwrap();
     let turn = watcher.playlist_turn(PLAYLIST).await;
     assert!(matches!(turn, PlaylistTurn::Listed(Ok(_))), "{turn:?}");
     assert!(s.db.requested_playlists().await.unwrap().is_empty());

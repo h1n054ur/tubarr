@@ -16,6 +16,24 @@ Who fetches the URL depends on the client:
 
 On your home network both work, as long as `public_url` is an address your devices can reach. Outside it, the second kind fails, which is what [Viewers outside your network](#viewers-outside-your-network) is about.
 
+## How the file is built
+
+`GET` and `HEAD /play/{video_id}` serve one virtual MP4 with Range support. Tubarr reads YouTube's video-only and audio-only fragmented MP4 files, builds a header in memory, and maps every byte range a player asks for onto that header and onto byte ranges of the two YouTube files. The media data passes through untouched and nothing runs ffmpeg.
+
+- The file is flat (progressive), not fragmented: an `ftyp`, a complete `moov` up front, then one `mdat`. Players seek with its sample tables and never have to find a fragment on their own, which Samsung's AVPlay cannot do.
+- The `moov` is the video file's with the audio track added as track 2. Each track gets full sample tables (`stts`, `ctts` when there are B-frames, `stss` for video, `stsc`, `stsz`, `stco` or `co64`) and its real length in `mvhd`, `tkhd` and `mdhd`. A video track with B-frames gets an edit list so it starts at 0.
+- The `mdat` holds the sample data of every YouTube fragment of both tracks in start time order, each fragment's data one chunk.
+- The sample tables come from the `moof` of every fragment, which costs one request per video fragment (short audio fragments are read together). With `[play] prebuild_tables` on (the default), Tubarr reads them in the background right after a grab, so the first play usually finds them ready, and plays always go before these reads. With it off, or for a video played before its read is done, the first play reads them. They are kept on disk, a few hundred KB per video, in `[play] index_dir` (default `.play-index` inside `complete_dir`), so later plays only read the two file heads. The folder is safe to delete: the next play reads the `moof`s again. Housekeeping keeps it under a size cap and removes tables left unused (see [Sizing](../../operations/sizing/#disk)).
+- The audio is AAC (itag 140, 141 or 139). When YouTube adds dubbed tracks, the original language track comes first.
+- Sample data is fetched from YouTube as the response streams and kept in a byte-bounded cache (`[play] fragment_cache_bytes`), because probing and seeking ask for the same small ranges again and again. When YouTube starts refusing the stream URLs (403) the lookup is refreshed once.
+- First plays of different videos read their tables side by side, up to `[play] max_builds` at once (2 by default), and one more waits for a turn. Plays of a video whose file is being built wait for that build and share it.
+- At most `[play] max_streams` responses stream at once (8 by default, 0 sets no cap). A `GET` past it answers 503 with `Retry-After: 5` and a warning in the log. A `HEAD` always answers. The Health page shows both counts under Playback.
+- An episode in parts plays as one file: `/play/<part1>,<part2>` takes the first part's `moov` with the samples of every part in order, each later part placed after the longer track of the part before it. The parts must decode alike (same codecs, picture size and audio layout).
+
+Lookups go through yt-dlp on a shared budget (`[rate_limit]`) and are cached for `cache_ttl`. After a 429, a bot check or a sign-in request, the optional `[fallback]` steps (a bgutil PO token server, then a cookies file) are tried in order. A cookies file signs lookups in as its account, which Google can flag or close: see [Terms and personal use](../../about/terms/).
+
+`GET` and `HEAD /play/{video_id}/audio` serve the same episode's audio alone as a flat M4A, for listening to a podcast without the picture.
+
 ## Libraries
 
 Point Jellyfin libraries at the folders where Sonarr and Radarr keep their titles, as Jellyfin sees them. Jellyfin does not need Tubarr's downloads folder.
@@ -57,6 +75,10 @@ trusted_proxies = ["172.18.0.10/32"]
 
 Only list proxies you run. Tubarr believes their `X-Forwarded-For` header and nobody else's.
 
+Tubarr judges `/play` by the right-most `X-Forwarded-For` address that is not a trusted proxy, so a client cannot get in by adding a fake address of its own. `X-Forwarded-For` from any other peer is ignored, and a trusted proxy that sends none is judged by its own address. The same client address decides `local_bypass` and the sign-in and setup code throttles. Rootless Docker and Podman can show every client as a private address, so there, set `play_allowed_networks` to the exact range Jellyfin fetches from.
+
+Do not forward port 8480 on your router or expose it on a public address. If Jellyfin runs elsewhere, connect the two over a VPN (WireGuard, Tailscale, NetBird) and add that range to `play_allowed_networks`. `listen` stays `0.0.0.0:8480` by default, since inside a container Tubarr must listen on all interfaces to be reachable at all. The network rule is what keeps strangers out.
+
 ## Viewers outside your network
 
 :::caution
@@ -69,7 +91,7 @@ The fix is a per-user setting in Jellyfin. In Jellyfin, open Dashboard, Users, p
 
 With it on, Jellyfin never hands that user's client the URL. It fetches `/play` itself and streams the result to the client, the same way it relays live TV. Since Tubarr's streams are already H.264 video with AAC audio, Jellyfin can usually pass them through with little work. It still runs them through ffmpeg, and transcodes for real when the client cannot play H.264 or the user's bitrate limit is lower, so the Jellyfin server needs the usual transcoding setup.
 
-The setting applies to the user wherever they watch, at home too. Turn it on for each user who ever watches from outside, and leave it off for the others.
+The setting applies to the user wherever they watch, at home too. Turn it on for each user who ever watches from outside, and leave it off for the others. That setting also covers Live TV, so check that first if you use it.
 
 Making `public_url` reachable from the internet instead is not a good fix: it would put `/play` on the internet, and `play_allowed_networks` would have to allow everyone.
 
@@ -92,7 +114,7 @@ A merge that was given up on (Jellyfin had not scanned the files in time) is que
 
 ## Episode images
 
-TheTVDB rarely has stills for podcast episodes, so Jellyfin shows them without an image. A show or daily show with **Episode images from YouTube** on gets each imported episode's YouTube thumbnail saved next to it as `<episode>-thumb.jpg`, a name Jellyfin reads as a local episode image. This also needs the [Sonarr webhook](../sonarr-and-radarr/#the-sonarr-webhook). Leave it off for regular shows, whose stills Jellyfin already finds.
+TheTVDB rarely has stills for podcast episodes, so Jellyfin shows them without an image. A show or daily show with **Episode images from YouTube** on gets each imported episode's YouTube thumbnail saved next to it as `<episode>-thumb.jpg`, a name Jellyfin reads as a local episode image. This also needs the [Sonarr webhook](../sonarr-and-radarr/#the-sonarr-webhook). The image is `maxresdefault`, else `hqdefault`, from `i.ytimg.com`, of the episode's first part. An image in place is never fetched again, one that cannot be fetched is logged and tried again on the next import or rename of the file, and the image goes when its episode file does and moves with a rename. Turning the option on fetches the images of episodes Sonarr already has, and `POST /admin/api/mappings/<id>/thumbnails` catches up on any still missing. Turning it off leaves the images in place. Leave it off for regular shows, whose stills Jellyfin already finds.
 
 ## Podcasts
 

@@ -155,6 +155,7 @@ impl std::fmt::Debug for Oidc {
 impl Oidc {
     pub fn new(config: OidcConfig) -> Result<Self, reqwest::Error> {
         let http = reqwest::Client::builder()
+            .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
             .timeout(Duration::from_secs(10))
             .build()?;

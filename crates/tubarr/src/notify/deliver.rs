@@ -93,6 +93,7 @@ enum Outcome {
 impl Delivery {
     pub fn new(endpoint: Endpoint, policy: RetryPolicy) -> Result<Self, reqwest::Error> {
         let client = reqwest::Client::builder()
+            .no_proxy()
             .timeout(policy.timeout)
             .user_agent(concat!("Tubarr/", env!("CARGO_PKG_VERSION")))
             .build()?;

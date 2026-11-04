@@ -98,7 +98,7 @@ Every lookup goes through yt-dlp, on a shared budget. When YouTube answers with 
 
 In order of what to try:
 
-1. **Wait it out.** Short spells of bot checks come and go. Don't raise the `[rate_limit]` budget: more lookups make it worse.
+1. **Wait it out.** Short spells of bot checks come and go. Don't raise the `[rate_limit]` budget: more lookups make it worse. If Tubarr runs on a VPS or cloud host, bot checks may come at once and stay. [Where to run it](../where-to-run/) explains why and what to change.
 2. **Update or roll back yt-dlp.** YouTube changes often, and yt-dlp follows within days. **Check now** on the Health page fetches the newest. If lookups broke right after an update, **Roll back** puts the previous version back. Set `[canary] video_id` so Tubarr notices on its own: three failed canary lookups in a row make it check for a yt-dlp update at once.
 3. **A PO token server.** YouTube asks some addresses, datacenter ones above all, for a proof of origin token. Run the bgutil PO token server next to Tubarr and set `[fallback] po_token_url` and `plugin_dir` (the image ships the plugin in `/opt/yt-dlp-plugins`, use the same version for the server). Tubarr then tries a token after a plain lookup is refused, and stays with it for `sticky_for`.
 4. **A cookies file, as the last resort.** `[fallback] cookies_file` points at a Netscape cookies file exported from a signed-in YouTube account. Tubarr uses it only after the plain lookup and the PO token step have failed, logs a warning each time, and never writes the file back.

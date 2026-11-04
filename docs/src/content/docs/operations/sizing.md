@@ -35,7 +35,7 @@ Container memory includes 35 to 50 MiB of page cache. Tubarr keeps what it grew 
 
 - **`[rate_limit] processes`**, the number of yt-dlp runs at once (default 1). Each one adds about 400 MiB at its peak, so add that much to the limit for each process over 1.
 - **`[play] fragment_cache_bytes`**, the in-memory cache of YouTube fragments (default 96 MiB). Raising it raises Tubarr's steady size by up to the difference, so add the difference to the limit.
-- **Plays at the same time.** Tubarr grew by about 50 to 65 MB per play in the runs above, fragment cache included. `[play] max_streams` caps the plays streaming at once (8 by default, one more gets a 503), and `[play] max_builds` the first plays reading their sample tables at once (2 by default). A household with more viewers at once needs more memory, and a higher `max_streams`.
+- **Plays at the same time.** Tubarr grew by about 50 to 65 MB per play in the runs above, fragment cache included. `[play] max_streams` caps the plays streaming at once (8 by default, one more gets a 503), and `[play] max_builds` the first plays reading their sample tables at once (2 by default). A player holds one stream open while it plays and now and then two around a seek, so 8 streams is four to eight viewers at once. `max_builds` also keeps a burst of first plays from flooding googlevideo with requests while others stream. A household with more viewers at once needs more memory, and a higher `max_streams`.
 
 For example, `processes = 2` with the default cache needs about 1.4 GiB.
 
@@ -59,6 +59,11 @@ Videos are never stored. Five stores grow with a library's history, and each has
 | Sample tables | used within `[play] index_max_idle`, and among the newest used that fit in `index_max_bytes` | 180 days, 2 GiB |
 
 Housekeeping runs 10 minutes after start and then every 6 hours. A zero value turns that store's rule off.
+
+- A watched video that goes was one no mapping would release or note any more. Dropping it changes what the matcher's per-mapping digest reads, so the next run matches that mapping once and then leaves it alone again. A backfill that finds an old upload again keeps it for a whole window, since it counts as seen.
+- Sonarr and Radarr ask the download history for their newest 60 grabs (`DownloadClientHistoryLimit`) and only look for the grabs they made minutes before, so a month is far more than they need. One history answer holds at most 500 grabs, `limit=0` included.
+- Activity events are what the Activity page lists under "Searches, pushes and plays": each Newznab search with its terms (never the API key), each push with the arr's answer, and each play start with its video ids, the player's user agent and the answer's status code. No addresses are kept. A month matches the download history, so both lists on the page reach back as far, and it is long enough to look into a play that failed last week. Sonarr's RSS sync searches every 15 minutes, so a month is some 3,000 searches per arr plus the plays and pushes: a megabyte or two.
+- A sample table's modified time is when a play last used it. A 40 minute 1080p episode's two tables take about 270 KB, so 2 GiB holds some eight thousand episodes. A play whose table was removed reads the `moof`s again, one slower first start, and a play already reading a table keeps its open file. Tables only speed plays up: nothing decides from them which videos may play.
 
 The sample tables folder is safe to delete. A play whose table is gone reads it again from YouTube, which makes that one first start slower.
 
