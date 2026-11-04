@@ -1,0 +1,24 @@
+{
+  "config": {
+    "misc": {
+      "complete_dir": "/downloads/tubarr",
+      "tv_categories": [],
+      "enable_tv_sorting": false,
+      "movie_categories": [],
+      "enable_movie_sorting": false,
+      "date_categories": [],
+      "enable_date_sorting": false,
+      "pre_check": false,
+      "history_retention": "",
+      "history_retention_option": "all",
+      "history_retention_number": 0
+    },
+    "categories": [
+      {"name": "*", "order": 0, "pp": "3", "script": "None", "dir": "", "priority": 0},
+      {"name": "tv", "order": 1, "pp": "", "script": "Default", "dir": "tv", "priority": -100},
+      {"name": "movies", "order": 2, "pp": "", "script": "Default", "dir": "movies", "priority": -100}
+    ],
+    "servers": [],
+    "sorters": []
+  }
+}

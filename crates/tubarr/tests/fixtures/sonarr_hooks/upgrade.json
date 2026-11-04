@@ -1,0 +1,95 @@
+{
+  "eventType": "Download",
+  "instanceName": "Sonarr",
+  "applicationUrl": "",
+  "series": {
+    "id": 17,
+    "title": "Kabhi Main Kabhi Tum",
+    "titleSlug": "kabhi-main-kabhi-tum",
+    "path": "/mnt/fk/data/media/pk-dramas/Kabhi Main Kabhi Tum (2024)",
+    "tvdbId": 452001,
+    "tvMazeId": 0,
+    "tmdbId": 0,
+    "imdbId": "",
+    "type": "standard",
+    "year": 2024,
+    "genres": [
+      "Drama"
+    ],
+    "images": [],
+    "tags": [
+      "youtube"
+    ],
+    "originalLanguage": {
+      "id": 1,
+      "name": "English"
+    }
+  },
+  "episodes": [
+    {
+      "id": 9102,
+      "episodeNumber": 2,
+      "seasonNumber": 1,
+      "title": "Episode 2",
+      "overview": "",
+      "airDate": "2024-07-03",
+      "airDateUtc": "2024-07-03T15:00:00Z",
+      "seriesId": 17,
+      "tvdbId": 10452002
+    }
+  ],
+  "episodeFile": {
+    "id": 5502,
+    "relativePath": "Season 1/Kabhi Main Kabhi Tum - S01E02 - Episode 2 WEBDL-1080p.strm",
+    "path": "/mnt/fk/data/media/pk-dramas/Kabhi Main Kabhi Tum (2024)/Season 1/Kabhi Main Kabhi Tum - S01E02 - Episode 2 WEBDL-1080p.strm",
+    "quality": "WEBDL-1080p",
+    "qualityVersion": 1,
+    "releaseGroup": "Tubarr",
+    "sceneName": "Kabhi.Main.Kabhi.Tum.S01E02.1080p.WEB-DL.AAC2.0.H.264.URDU-Tubarr",
+    "size": 64,
+    "dateAdded": "2026-10-24T06:00:00Z",
+    "languages": [
+      {
+        "id": 1,
+        "name": "English"
+      }
+    ],
+    "sourcePath": "/downloads/tubarr/tv/Kabhi.Main.Kabhi.Tum.S01E02.1080p.WEB-DL.AAC2.0.H.264.URDU-Tubarr/Kabhi.Main.Kabhi.Tum.S01E02.1080p.WEB-DL.AAC2.0.H.264.URDU-Tubarr.strm"
+  },
+  "release": {
+    "quality": "WEBDL-1080p",
+    "qualityVersion": 1,
+    "releaseGroup": "Tubarr",
+    "releaseTitle": "Kabhi.Main.Kabhi.Tum.S01E02.1080p.WEB-DL.AAC2.0.H.264.URDU-Tubarr",
+    "indexer": "Tubarr",
+    "size": 1500000000
+  },
+  "isUpgrade": true,
+  "downloadClient": "Tubarr",
+  "downloadClientType": "Sabnzbd",
+  "downloadId": "SABnzbd_nzo_tubarr_0eD-GQCutAU",
+  "customFormatInfo": {
+    "customFormats": [],
+    "customFormatScore": 0
+  },
+  "deletedFiles": [
+    {
+      "id": 5490,
+      "relativePath": "Season 1/Kabhi Main Kabhi Tum - S01E02 - Episode 2 WEBDL-720p.strm",
+      "path": "/mnt/fk/data/media/pk-dramas/Kabhi Main Kabhi Tum (2024)/Season 1/Kabhi Main Kabhi Tum - S01E02 - Episode 2 WEBDL-720p.strm",
+      "quality": "WEBDL-720p",
+      "qualityVersion": 1,
+      "releaseGroup": "Tubarr",
+      "sceneName": "Kabhi.Main.Kabhi.Tum.S01E02.1080p.WEB-DL.AAC2.0.H.264.URDU-Tubarr",
+      "size": 64,
+      "dateAdded": "2026-10-24T06:00:00Z",
+      "languages": [
+        {
+          "id": 1,
+          "name": "English"
+        }
+      ],
+      "recycleBinPath": ""
+    }
+  ]
+}

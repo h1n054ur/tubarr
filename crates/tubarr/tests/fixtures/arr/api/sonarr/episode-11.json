@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1101, "seriesId": 11, "tvdbId": 9000001, "episodeFileId": 501,
+    "seasonNumber": 1, "episodeNumber": 1, "title": "Episode 1",
+    "airDate": "2024-07-02", "airDateUtc": "2024-07-02T15:00:00Z",
+    "runtime": 40, "hasFile": true, "monitored": true,
+    "absoluteEpisodeNumber": 1, "unverifiedSceneNumbering": false
+  },
+  {
+    "id": 1102, "seriesId": 11, "tvdbId": 9000002, "episodeFileId": 0,
+    "seasonNumber": 1, "episodeNumber": 2, "title": "Episode 2",
+    "airDate": "2024-07-03", "airDateUtc": "2024-07-03T15:00:00Z",
+    "runtime": 40, "hasFile": false, "monitored": true,
+    "absoluteEpisodeNumber": 2, "unverifiedSceneNumbering": false
+  },
+  {
+    "id": 1103, "seriesId": 11, "tvdbId": 9000003, "episodeFileId": 0,
+    "seasonNumber": 1, "episodeNumber": 3, "title": "Episode 3",
+    "airDate": "2024-07-09", "airDateUtc": "2024-07-09T15:00:00Z",
+    "runtime": 40, "hasFile": false, "monitored": false,
+    "absoluteEpisodeNumber": 3, "unverifiedSceneNumbering": false
+  },
+  {
+    "id": 1104, "seriesId": 11, "tvdbId": 9000004, "episodeFileId": 0,
+    "seasonNumber": 1, "episodeNumber": 4, "title": "TBA",
+    "runtime": 0, "hasFile": false, "monitored": true,
+    "unverifiedSceneNumbering": false
+  }
+]

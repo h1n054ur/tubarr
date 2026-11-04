@@ -1,0 +1,58 @@
+/* Tubarr palette tokens. Dark is the primary theme; light is derived for light surfaces.
+   *-text tokens are the text-safe versions of the brand colours (4.5:1 or more on --tubarr-bg). */
+:root {
+  /* brand */
+  --tubarr-red: #FF5A4D;
+  --tubarr-red-dark: #E03E32;
+  --tubarr-cyan: #22D3EE;
+  --tubarr-navy: #0B1220;
+  --tubarr-slate: #1F2937;
+  --tubarr-muted: #94A3B8;
+  --tubarr-warm-white: #F8FAFC;
+  /* theme: dark (default) */
+  --tubarr-primary: #FF5A4D;
+  --tubarr-primary-strong: #E03E32;
+  --tubarr-secondary: #22D3EE;
+  --tubarr-bg: #0B1220;
+  --tubarr-surface: #1F2937;
+  --tubarr-surface-2: #162033;
+  --tubarr-border: #2B3646;
+  --tubarr-text: #F8FAFC;
+  --tubarr-text-secondary: #94A3B8;
+  --tubarr-primary-text: #FF6E62;
+  --tubarr-secondary-text: #22D3EE;
+  --tubarr-on-primary: #0B1220;
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  --tubarr-primary: #FF5A4D;
+  --tubarr-primary-strong: #E03E32;
+  --tubarr-secondary: #0891B2;
+  --tubarr-bg: #F8FAFC;
+  --tubarr-surface: #FFFFFF;
+  --tubarr-surface-2: #F1F5F9;
+  --tubarr-border: #E2E8F0;
+  --tubarr-text: #0B1220;
+  --tubarr-text-secondary: #475569;
+  --tubarr-primary-text: #C7342A;
+  --tubarr-secondary-text: #0E7490;
+  --tubarr-on-primary: #0B1220;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --tubarr-primary: #FF5A4D;
+    --tubarr-primary-strong: #E03E32;
+    --tubarr-secondary: #0891B2;
+    --tubarr-bg: #F8FAFC;
+    --tubarr-surface: #FFFFFF;
+    --tubarr-surface-2: #F1F5F9;
+    --tubarr-border: #E2E8F0;
+    --tubarr-text: #0B1220;
+    --tubarr-text-secondary: #475569;
+    --tubarr-primary-text: #C7342A;
+    --tubarr-secondary-text: #0E7490;
+    --tubarr-on-primary: #0B1220;
+    color-scheme: light;
+  }
+}

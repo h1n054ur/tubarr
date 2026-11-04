@@ -1,0 +1,55 @@
+# cargo-deny: licences and security advisories for the Rust dependencies. CI runs
+# `cargo deny check advisories licenses bans sources`. Tubarr is AGPL-3.0-only, so every licence
+# below is one that can be combined with it. A crate under any other licence fails the check
+# until someone reads its terms and adds it here on purpose.
+
+[graph]
+all-features = true
+
+[advisories]
+# Any RustSec advisory (vulnerability, unsound, unmaintained or yanked) fails the check. An
+# advisory that does not affect Tubarr goes in `ignore` with its id and the reason.
+version = 2
+yanked = "deny"
+ignore = [
+    # rsa and crypto-bigint 0.5 come in through openidconnect, which only verifies ID token
+    # signatures with the provider's public keys. Both advisories are about timing leaks of
+    # secret values, and Tubarr holds no RSA or elliptic curve private key. Neither has a fixed
+    # release on the line openidconnect uses. Drop these once it moves on.
+    { id = "RUSTSEC-2023-0071", reason = "rsa: public key verification only, no private key in Tubarr" },
+    { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5: public key verification only, no secret integers" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+allow = [
+    "AGPL-3.0-only",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-1-Clause",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+
+[licenses.private]
+ignore = false
+
+[bans]
+multiple-versions = "allow"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

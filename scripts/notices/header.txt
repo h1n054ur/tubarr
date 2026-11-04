@@ -1,0 +1,38 @@
+Third-party notices for the Tubarr image
+========================================================================
+
+Tubarr itself is licensed under the GNU Affero General Public License v3.0 only
+(see /usr/share/doc/tubarr/LICENSE). The image also carries the software below,
+each under its own licence. Its source is available from the links given.
+
+Bundled in the image
+------------------------------------------------------------------------
+
+bgutil-ytdlp-pot-provider (yt-dlp plugin), in /opt/yt-dlp-plugins
+  Licence: GNU General Public License v3.0 (full text at the end of this file
+  and in /opt/yt-dlp-plugins/LICENSE)
+  Source: https://github.com/Brainicism/bgutil-ytdlp-pot-provider
+  The plugin ships as its Python source files, unchanged from the upstream
+  release. Tubarr does not link to it: yt-dlp loads it as a separate program
+  when [fallback] po_token_url is set.
+
+Debian base system: the packages in the debian:trixie-slim base image, plus
+  ca-certificates and tini, each under its own licence, listed in
+  /usr/share/doc/<package>/copyright.
+
+Downloaded on first start, not part of the image
+------------------------------------------------------------------------
+
+Tubarr fetches these from their GitHub releases into /config/bin and keeps them
+current. They are not distributed with the image.
+
+yt-dlp (yt-dlp_linux standalone build)
+  Licence: the yt-dlp code is under the Unlicense. The standalone build bundles
+  Python and other GPLv3+ code, so that build as a whole is under the GNU
+  General Public License v3.0 or later.
+  Source: https://github.com/yt-dlp/yt-dlp
+
+deno
+  Licence: MIT
+  Source: https://github.com/denoland/deno
+

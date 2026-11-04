@@ -1,0 +1,9 @@
+Rust crates (compiled into the tubarr binary)
+========================================================================
+{{#each licenses}}
+
+{{name}} ({{id}}), used by:
+{{#each used_by}}  {{crate.name}} {{crate.version}}
+{{/each}}------------------------------------------------------------------------
+{{{text}}}
+{{/each}}

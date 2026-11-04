@@ -1,0 +1,269 @@
+# Tubarr config. Copy to /config/tubarr.toml and set public_url and api_key_file. Every other key is commented out
+# with its default. Keys without a default (ids, URLs, extra paths, the channel table) show an
+# example value instead. Keep only what you change. Durations are written like "90s", "15m", "1h".
+# Secrets never go in this file: keys ending in _file name a file holding the value, read once at
+# start. A bad value stops Tubarr at start with a message naming the key.
+
+# Required, no default: the URL Jellyfin, Sonarr and Radarr use to reach Tubarr. Written into every
+# .strm file and every NZB link, so it must work from their containers.
+public_url = "http://tubarr.example.lan:8480"
+
+# listen = "0.0.0.0:8480"
+# data_dir = "/config"                  # holds tubarr.db (SQLite)
+# complete_dir = "/downloads/tubarr"    # absolute. Grabs write .strm and .srt here, and Sonarr and
+#                                       # Radarr must see the same path in their containers
+# cache_ttl = "5h"                      # resolved stream lookups, at most 6h (YouTube's addresses expire)
+# lookup_timeout = "60s"                # a yt-dlp run is killed after this, at most 10m
+# api_key_file = "/run/secrets/tubarr_api_key"   # the key Sonarr and Radarr send (and scripts, as
+#                                                # X-Api-Key on /admin/api). Without it /api refuses
+#                                                # every request
+
+# The shared YouTube lookup budget: a token bucket refilled with `lookups` every `interval`.
+[rate_limit]
+# lookups = 1
+# interval = "10s"
+# burst = 3                             # lookups allowed back to back after a quiet spell
+# jitter = "3s"                         # random delay added to a lookup that has to wait, at most interval
+# throttle_pause = "15m"                # every lookup waits this long after a 429 or a bot check
+# processes = 1                         # yt-dlp runs at once, plays first. Each takes about 400 MB with deno
+
+# yt-dlp and deno: Tubarr downloads both from their GitHub releases into bin_dir and keeps them current.
+[binaries]
+# bin_dir = "/config/bin"
+# yt_dlp = "/usr/local/bin/yt-dlp"      # use a yt-dlp installed some other way, never updated by Tubarr
+# deno = "/usr/local/bin/deno"          # the same for deno
+# yt_dlp_channel = "stable"             # or "nightly"
+# check_interval = "24h"                # least time between two update checks
+
+# How new uploads on mapped channels are found.
+[watcher]
+# rss_interval = "30m"                  # each channel's RSS feed
+# rss_jitter = "5m"
+# rss_spacing = "5s"                    # least time between two feed reads
+# listing_interval = "24h"              # each channel's full video list, spread over the interval
+# listing_size = 100                    # newest videos a full list reads
+# While a channel's feed has failed for longer than rss_interval (YouTube sometimes answers every
+# feed with 404 or 500 for hours), a short list of its newest uploads is read about every
+# rss_interval instead, until a feed read works again.
+# fallback_listing_size = 15            # newest videos a fallback list reads
+# fallback_per_hour = 30                # most fallback lists an hour, all channels. 0 turns them off
+# playlist_interval = "24h"             # each official playlist a mapping names
+# A show without a playlist also gets a search of its channels for its title and aliases (one
+# lookup per channel and name, at most 3 names, plus one for "<name> Episode" when a search
+# comes back full of clips), once a day, until every wanted episode is
+# released or backfill_days pass. Mapping it, or changing its channels or aliases, starts over.
+# A search that fails on a timeout, network error or 5xx is tried once more after an hour.
+# backfill_days = 14                    # 0 turns the search off
+# backfill_interval = "24h"             # least time between two searches for one show
+# backfill_spacing = "10m"              # least time between two shows' searches
+# backfill_size = 400                   # results one search reads
+
+# The /play relay.
+[play]
+# fragment_cache_bytes = 100663296      # 96 MiB of YouTube fragments in memory (8 MiB to 1 GiB)
+# probe_bytes = 65536                   # read from each file to find its index (4 KiB to 16 MiB)
+# index_dir = "/downloads/tubarr/.play-index"   # absolute. Sample tables read from each video's
+#                                               # fragments, a few hundred KB per video, so later
+#                                               # plays start sooner. Safe to delete
+# prebuild_tables = true                # read a grabbed video's sample tables in the background, so its
+#                                       # first play starts sooner. Plays always go first
+# index_max_bytes = 2147483648          # 2 GiB of sample tables, about 270 KB per 40 minute episode.
+#                                       # Above it the ones used longest ago go. 0 sets no cap
+# index_max_idle = "180days"            # a table not used for this long goes. 0s keeps them
+# max_builds = 2                        # first plays reading their sample tables at once (1 to 8).
+#                                       # More wait for a turn, and plays of the same video share its read
+# max_streams = 8                       # plays streaming at once, sized for a 1 GiB container (about
+#                                       # 65 MB each). Past it a play answers 503 with Retry-After.
+#                                       # 0 sets no cap
+
+# Captions written next to each .strm as <release>.<code>.srt.
+[subtitles]
+# languages = ["en", "ur", "hi"]        # ISO 639-1 codes
+# automatic = true                      # YouTube's speech-to-text track in the spoken language when no
+#                                       # uploaded one exists (never machine translations)
+# timeout = "15s"                       # lookup plus downloads before the grab reports done, at most 60s
+
+# Which Sonarr series and Radarr films Tubarr serves.
+[arr]
+# tag = "youtube"                       # the tag on those titles, also on Tubarr's indexer and client
+# sync_interval = "15m"                 # at least 1m, the first read runs at start
+# auto_push = true                      # push each episode or film Tubarr first releases to the arr
+#                                       # (old name: auto_search)
+# push_interval = "5s"                  # at least 1s between two pushes to one arr
+# indexer = "Tubarr"                    # Tubarr's indexer name in the arrs
+# download_client = "Tubarr"            # Tubarr's download client name in the arrs, pushes are pinned to it
+# grab_retention = "30days"             # grabs older than this leave the download history the arrs
+#                                       # poll. Their files stay. 0s keeps every grab
+
+# Films: official film channels and how close a title must be.
+[films]
+# channels = ["UCxxxxxxxxxxxxxxxxxxxxxx"]   # channel ids searched for every film
+# min_duration = "80m"                  # shorter uploads are clips or trailers
+# similarity = 0.9                      # 0.5 to 1
+
+# What Tubarr knows about each official channel, by channel id. Drafts of missing TVDB and TMDB
+# entries take the network, country and time zone from here. A show whose language is still the
+# arr's English or Unknown (Sonarr has no Urdu) takes its first channel's language for its release
+# names, so they say URDU. A language set in the admin UI is never changed. Older files with
+# [drafts.channels] still load. Set only one of the two.
+# root_folder puts the channel's titles under that Sonarr or Radarr root folder, so they land in
+# their own Jellyfin library. show_root_folder and film_root_folder win over it for their kind.
+# No channel is set by default. An example, for ARY Digital:
+# [channels.UC4JCksJF76g_MdzPVBJoC3Q]
+# network = "ARY Digital"
+# country = "Pakistan"
+# language = "Urdu"
+# utc_offset_mins = 300
+# timezone = "America/Chicago"          # an IANA time zone wins over utc_offset_mins and follows DST,
+#                                       # which a US channel needs
+# root_folder = "/data/media/pk-dramas"
+# listing_size = 300                    # this channel's daily list reads more than [watcher]'s, for a
+#                                       # channel that uploads dozens of videos a day
+# assumed_height = 720                  # over [matcher]'s, for a channel that uploads below 1080p
+
+# [channels.UCxxxxxxxxxxxxxxxxxxxxxx]   # another network, the show list fills these in
+# network = "Hum TV"
+# country = "Pakistan"
+# language = "Urdu"
+# utc_offset_mins = 300
+
+# The draft helper for titles missing from TVDB or TMDB. Optional: without these files the drafts
+# still come out, marked as not checked. Each file holds only the key.
+[drafts]
+# tvdb_api_key_file = "/run/secrets/tvdb_api_key"         # a TVDB v4 project API key
+# tvdb_pin_file = "/run/secrets/tvdb_pin"                 # the subscriber PIN, only with a
+#                                                         # user-supported TVDB key
+# tmdb_read_token_file = "/run/secrets/tmdb_read_token"   # the TMDB API read access token (the
+#                                                         # long one, sent as a bearer token)
+
+# Root folders by language, for titles whose first channel sets none. Language names match the
+# mapping's language in any case. After each arr sync Tubarr asks Sonarr or Radarr to move a title
+# (with its files) whose root folder differs, once per wanted folder. The folder must already
+# exist in the arr (Settings, Media Management): Tubarr never creates one and logs a warning. A
+# mapping's root_folder override in the admin UI wins, and "none" turns routing off for it.
+# [root_folders.shows]
+# Urdu = "/data/media/pk-dramas"
+# Hindi = "/data/media/in-dramas"
+# [root_folders.films]
+# Hindi = "/data/media/in-films"
+
+# The show matcher. It also runs after each watcher find and each arr sync.
+[matcher]
+# interval = "30m"                      # at least 1m
+# lookups_per_run = 3                   # at most 20, taken from the same budget as plays. Only
+#                                       # videos with an unknown duration wait for one
+# assumed_height = 1080                 # at most 1080. Releases are named with this height until a
+#                                       # grab or a play looks the video up and the real height
+#                                       # replaces it (same guid). 0 waits for a lookup instead
+# note_retention = "180days"            # unmatched notes are kept for videos uploaded within this
+#                                       # long, notes waiting on a lookup always. 0s keeps every note
+
+# A copy of the database, taken next to it before an upgrade migrates it, named
+# tubarr.db.pre-<from>-to-<to>.<UTC time>.bak. Put it back as tubarr.db to run the older image.
+[backup]
+# before_migrations = true              # false migrates without a copy. A failed copy stops the
+#                                       # start, so nothing migrates without one
+# keep = 3                              # copies kept, the newest. At least 1
+
+# What the Activity page keeps besides grabs.
+[activity]
+# retention = "30days"                  # searches, arr pushes and play starts older than this are
+#                                       # dropped. 0s keeps every event
+
+# What the Newznab answers carry.
+[newznab]
+# report_size = false                   # off: no size goes out, so Sonarr and Radarr skip their size
+#                                       # check. Their quality size table is global and expects far
+#                                       # bigger files than YouTube's H.264 (a 38 min 1080p episode of
+#                                       # 420 MB fails a 570 MB minimum)
+
+# Optional, all off by default. Tried in this order only after a plain lookup gets a 429, a bot
+# check or a sign-in request.
+[fallback]
+# po_token_url = "http://bgutil:4416"   # a bgutil PO token HTTP server
+# plugin_dir = "/opt/yt-dlp-plugins"    # the image ships the matching bgutil plugin here
+# cookies_file = "/run/secrets/youtube_cookies"  # a spare account only, never written back. Google
+#                                       # can flag or close it, see "Terms and personal use" in the README
+# sticky_for = "1h"                     # after the PO token step works, lookups start there this long (cookies are never sticky)
+# min_height = 720                      # a fallback answer below this video height counts as failed
+
+# A lookup of a known good video every so often, so trouble shows before a play fails. Off
+# without video_id.
+[canary]
+# video_id = "xxxxxxxxxxx"
+# interval = "1h"                       # at least 10m
+# jitter = "10m"
+
+# Optional notices: the canary failing and recovering, cookies use, yt-dlp and deno updates, grabs
+# (one notice per 10 minutes) and a daily unmatched digest. Set a Discord webhook, or a JSON
+# webhook URL with its token, not both. See "Notices" in the README for the JSON body.
+[notify]
+# discord_webhook_file = "/run/secrets/discord_webhook"   # a file holding a Discord webhook URL.
+#                                                         # Tubarr posts each notice as a card
+# card_relay_url = "http://notices:9940/tubarr"           # any http(s) URL. Tubarr posts
+#                                                         # each notice there as JSON
+# card_relay_token_file = "/run/secrets/card_relay_token" # required with card_relay_url, sent as
+#                                                         # Authorization: Bearer
+
+# Sign-in for the web UI and /admin/api. The first admin needs the setup code from the log (or
+# TUBARR_SETUP_CODE). Scripts can still send api_key_file's key as X-Api-Key. /api keeps its
+# apikey, /healthz is open.
+[auth]
+# method = "forms"                      # "forms" (username and password), "oidc" or "forms+oidc"
+# session_ttl = "30d"                   # a session ends after this long without a request
+# session_max_age = "90d"               # and this long after sign-in, whatever the activity
+# cookie_secure = true                  # unset: on when ui_url (or public_url) is https
+# local_bypass = false                  # loopback and private clients skip sign-in. Behind a reverse
+#                                       # proxy, list it in trusted_proxies or keep this off
+# ui_url = "https://tubarr.example.dev" # where people open the UI, if not public_url
+# play_allowed_networks = ["192.0.2.0/24"]    # who may fetch /play (Jellyfin). Unset or empty: loopback,
+#                                       # private, link-local and 100.64.0.0/10 only, with a warning at
+#                                       # start. ["0.0.0.0/0", "::/0"] allows everyone
+# trusted_proxies = ["192.0.2.2/32"]    # reverse proxies whose X-Forwarded-For names the client for
+#                                       # /play, local_bypass and the sign-in throttle
+
+# OpenID Connect (Authentik, Keycloak...). Register the redirect <ui_url>/auth/oidc/callback.
+# [auth.oidc]
+# issuer_url = "https://auth.example.dev/application/o/tubarr/"   # exactly as the provider's iss
+# client_id = "tubarr"
+# client_secret_file = "/run/secrets/tubarr_oidc_secret"
+# scopes = ["openid", "profile", "email", "groups"]
+# allowed_groups = ["admins"]           # empty lets in anyone the provider signs in
+# groups_claim = "groups"
+# button_label = "Sign in with SSO"
+# auto_create_users = true              # default: true when allowed_groups is set
+
+# Optional. Without them Tubarr serves no titles from that app, unless it is connected on the
+# Settings page instead. A connection set here wins over one saved there.
+# [sonarr]
+# url = "http://sonarr:8989"
+# api_key_file = "/run/secrets/sonarr_api_key"
+
+# [radarr]
+# url = "http://radarr:7878"
+# api_key_file = "/run/secrets/radarr_api_key"
+
+# Optional. Sonarr's Connect webhook at /hooks/sonarr, which keeps the "Audio only" versions and
+# the YouTube thumbnail images of episodes for mappings that turn them on. Off without
+# sonarr_token_file.
+# [hooks]
+# sonarr_token_file = "/run/secrets/sonarr_hook_token"   # Sonarr sends it as Authorization: Bearer
+# library_paths = [["/mnt/media", "/media"]]             # [as Sonarr sees it, as Tubarr sees it]. Tubarr
+#                                                        # only touches files under these
+
+# Optional. Jellyfin, which merges each "Audio only" file into its episode as a version (Jellyfin
+# 10.11 does not group TV episode versions by name). Off without this section.
+# [jellyfin]
+# url = "http://jellyfin:8096"
+# api_key_file = "/run/secrets/jellyfin_api_key"   # an API key from Dashboard > API Keys
+# user_id = ""                                     # the user for the playback info call, by default the first admin
+# library_paths = [["/media", "/data/media"]]      # [as Tubarr sees it, as Jellyfin sees it], when different
+# merge_retry = "30s"                              # first wait for Jellyfin's scan, doubled each time
+# merge_attempts = 7                               # looks before a merge is given up on
+
+# Optional, off by default. A Prometheus endpoint at /metrics (see "Monitoring" in the README).
+# [metrics]
+# enabled = true
+# token_file = "/run/secrets/metrics_token"   # the scraper sends it as Authorization: Bearer. Without
+#                                             # it the API key is the token, and with neither only
+#                                             # auth.play_allowed_networks may scrape

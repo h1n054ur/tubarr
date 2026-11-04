@@ -1,0 +1,44 @@
+# Tubarr next to Sonarr and Radarr. Copy config/tubarr.example.toml to ./config/tubarr.toml and
+# set public_url first. The config folder must be writable by uid 1000.
+services:
+  tubarr:
+    # 0.1 follows the newest 0.1.x release, and 0.1.0 would pin one build.
+    image: ghcr.io/h1n054ur/tubarr:0.1
+    container_name: tubarr
+    restart: unless-stopped
+    ports:
+      - "8480:8480"
+    volumes:
+      - ./config:/config                # tubarr.toml, tubarr.db, the managed yt-dlp and deno
+      - /srv/media/downloads:/downloads # the same folder, at the same path, as in Sonarr and Radarr
+    # Each secret appears as /run/secrets/<name> (point the *_file keys in tubarr.toml there). Compose
+    # mounts the files as they are, so uid 1000 must be able to read them.
+    secrets:
+      - tubarr_api_key
+      # Only if you connect Sonarr and Radarr in tubarr.toml instead of on the Settings page:
+      # create the key file first, then uncomment its line here and below.
+      # - sonarr_api_key
+      # - radarr_api_key
+    environment:
+      RUST_LOG: info
+    # Measured peak with the default config: about 600 MiB for a yt-dlp lookup while two plays
+    # stream, and a lookup alone peaks near 475 MiB, so 512m is too small. 1g leaves room for a
+    # full fragment cache on top. Raise it by about 400 MiB for each [rate_limit] processes over 1,
+    # by as much as you raise [play] fragment_cache_bytes over its 96 MiB default, and by about
+    # 65 MiB for each [play] max_streams over 8. See "Sizing" in the README.
+    mem_limit: 1g
+    # The image has the same check built in. It is repeated here so it is easy to tune.
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/tubarr", "--healthcheck"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+secrets:
+  tubarr_api_key:
+    file: ./secrets/tubarr_api_key
+  # sonarr_api_key:
+  #   file: ./secrets/sonarr_api_key
+  # radarr_api_key:
+  #   file: ./secrets/radarr_api_key

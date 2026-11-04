@@ -1,0 +1,51 @@
+[
+  {
+    "title": "Ishq Hua",
+    "originalTitle": "عشق ہوا",
+    "originalLanguage": { "id": 0, "name": "Unknown" },
+    "alternateTitles": [
+      { "sourceType": "tmdb", "movieMetadataId": 0, "title": "Ishq Huwa" }
+    ],
+    "secondaryYearSourceId": 0,
+    "sortTitle": "ishq hua",
+    "sizeOnDisk": 0,
+    "status": "released",
+    "overview": "A telefilm about two cousins.",
+    "releaseDate": "2019-02-14T00:00:00Z",
+    "images": [],
+    "website": "",
+    "remotePoster": "",
+    "year": 2019,
+    "studio": "",
+    "qualityProfileId": 0,
+    "monitored": false,
+    "minimumAvailability": "tba",
+    "isAvailable": true,
+    "folderName": "",
+    "runtime": 95,
+    "cleanTitle": "ishqhua",
+    "imdbId": "",
+    "tmdbId": 612345,
+    "titleSlug": "612345",
+    "certification": "",
+    "genres": ["TV Movie", "Romance"],
+    "tags": [],
+    "added": "0001-01-01T00:00:00Z",
+    "ratings": { "tmdb": { "votes": 3, "value": 6.0, "type": "user" } },
+    "popularity": 0.6
+  },
+  {
+    "id": 21,
+    "title": "Theri",
+    "originalTitle": "தெறி",
+    "originalLanguage": { "id": 43, "name": "Tamil" },
+    "alternateTitles": [{ "sourceType": "tmdb", "movieMetadataId": 7, "title": "Policeodu" }],
+    "year": 2016,
+    "tmdbId": 352173,
+    "imdbId": "tt4598468",
+    "genres": ["Action", "Drama"],
+    "runtime": 158,
+    "monitored": true,
+    "tags": [3]
+  }
+]

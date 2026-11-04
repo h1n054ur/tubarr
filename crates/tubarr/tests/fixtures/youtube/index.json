@@ -1,0 +1,112 @@
+{
+  "about": "yt-dlp and YouTube answers recorded on 2026-10-16 with the yt-dlp_linux standalone binary 2026.08.19 and deno 2.9.7. Recorded lookups are scrubbed: the ip and fvip query parameters and any addresses removed, thumbnails, heatmap, description, tags, fragments and most automatic caption languages dropped.",
+  "fixtures": [
+    {
+      "name": "bot_check",
+      "command": ["-J", "--no-warnings", "--js-runtimes", "deno", "--", "0eD-GQCutAU"],
+      "stdout": "stdout-failed-lookup.json",
+      "stderr": "stderr-bot-check.txt",
+      "exit_code": 1,
+      "note": "YouTube asked for a sign-in after a burst of lookups from one address. -J prints null on stdout when the lookup fails."
+    },
+    {
+      "name": "feed_server_error",
+      "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UC4JCksJF76g_MdzPVBJoC3Q",
+      "status": 500,
+      "body": "feed-server-error.html",
+      "note": "The channel feed answered with a Google 500 page instead of Atom XML."
+    },
+    {
+      "name": "flat_listing",
+      "command": ["--flat-playlist", "-J", "--no-warnings", "--ignore-config", "--playlist-end", "100", "--extractor-args", "youtubetab:approximate_date", "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q/videos"],
+      "stdout": "flat-listing.json",
+      "exit_code": 0,
+      "note": "Written by hand in yt-dlp's flat playlist shape (yt_dlp/extractor/youtube/_tab.py, _extract_video), not recorded, since no live lookups were allowed. timestamp is filled only with approximate_date."
+    },
+    {
+      "name": "flat_playlist",
+      "command": ["--flat-playlist", "-J", "--no-warnings", "--ignore-config", "--playlist-end", "500", "--extractor-args", "youtubetab:approximate_date", "https://www.youtube.com/playlist?list=PLkmktOfficialPlaylist0000000001"],
+      "stdout": "flat-playlist.json",
+      "exit_code": 0,
+      "note": "Written by hand in yt-dlp's flat playlist shape (yt_dlp/extractor/youtube/_tab.py: _extract_video for playlistVideoRenderer entries, _extract_metadata_from_tabs for the top level), not recorded, since no live lookups were allowed. Playlist pages show no upload time, so timestamp stays null. A private video keeps its place with the title [Private video] and no channel."
+    },
+    {
+      "name": "flat_channel_search",
+      "command": ["--flat-playlist", "-J", "--no-warnings", "--ignore-config", "--playlist-end", "200", "--extractor-args", "youtubetab:approximate_date", "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q/search?query=Dar+E+Nijaat"],
+      "stdout": "flat-channel-search.json",
+      "exit_code": 0,
+      "note": "Written by hand in yt-dlp's flat shape for a channel search tab (yt_dlp/extractor/youtube/_tab.py: the Search tab test for /c/3blue1brown/search?query=..., _extract_video for videoRenderer entries, a playlistRenderer result as a YoutubeTab url), not recorded, since no live lookups were allowed. Search results show '2 years ago', so timestamp is filled with approximate_date. The reaction from another channel checks that only the channel's own uploads are kept."
+    },
+    {
+      "name": "feed_channel",
+      "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UC4JCksJF76g_MdzPVBJoC3Q",
+      "status": 200,
+      "body": "feed-channel.xml",
+      "note": "Written by hand in the shape of a YouTube channel feed, trimmed to three entries (real feeds list 15)."
+    },
+    {
+      "name": "feed_channel_new_upload",
+      "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UC4JCksJF76g_MdzPVBJoC3Q",
+      "status": 200,
+      "body": "feed-channel-new-upload.xml",
+      "note": "The same feed after one new upload (Zq8uV4hNs1M)."
+    },
+    {
+      "name": "lookup_film_1080p",
+      "command": ["-J", "--no-warnings", "--ignore-config", "--no-playlist", "--js-runtimes", "deno:<path>", "https://www.youtube.com/watch?v=ldmPWRb-XcM"],
+      "stdout": "lookup-film-1080p.json",
+      "exit_code": 0,
+      "note": "Recorded lookup of a Goldmines film. Offers 137 (1080p H.264) and 140 (AAC) as plain https formats, only from the visionos client. Stream URLs are expired and bound to the recording address."
+    },
+    {
+      "name": "lookup_dubbed_audio",
+      "command": ["-J", "--no-warnings", "--js-runtimes", "deno:<path>", "https://www.youtube.com/watch?v=wykbxHM2Ch4"],
+      "stdout": "lookup-dubbed-audio.json",
+      "exit_code": 0,
+      "note": "Recorded lookup of Tere Bin Episode 01 on HAR PAL GEO (2026-10-16). YouTube added auto dubbed audio, so every audio format carries a track suffix (140-0 to 140-11, 139-N, 249-N to 251-N) and no plain 140 exists. 140-11 is the original track (language_preference 10). Only plain https formats kept, URLs cut to expire, itag and size parameters, captions dropped."
+    },
+    {
+      "name": "lookup_episode_no_1080p",
+      "command": ["-J", "--no-warnings", "--ignore-config", "--no-playlist", "--js-runtimes", "deno:<path>", "https://www.youtube.com/watch?v=0eD-GQCutAU"],
+      "stdout": "lookup-episode-no-1080p.json",
+      "exit_code": 0,
+      "note": "Recorded lookup of an ARY episode that succeeded but topped out at 324p (format 134, H.264). No 137, 136 or 135, so Tubarr has no format to serve. Earlier the same video offered 137."
+    },
+    {
+      "name": "flat_listing_recorded",
+      "command": ["--flat-playlist", "-J", "--no-warnings", "--ignore-config", "--playlist-end", "30", "--extractor-args", "youtubetab:approximate_date", "--js-runtimes", "deno:<path>", "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q/videos"],
+      "stdout": "flat-listing-recorded.json",
+      "exit_code": 0,
+      "note": "Recorded flat listing of the ARY Digital HD channel, 30 entries, timestamp filled by approximate_date."
+    },
+    {
+      "name": "feed_channel_recorded",
+      "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UC4JCksJF76g_MdzPVBJoC3Q",
+      "status": 200,
+      "body": "feed-channel-recorded.xml",
+      "note": "Recorded channel feed, 15 entries."
+    },
+    {
+      "name": "unavailable",
+      "command": ["-J", "--no-warnings", "--ignore-config", "--no-playlist", "--js-runtimes", "deno:<path>", "https://www.youtube.com/watch?v=xxxxxxxxxxx"],
+      "stdout": "stdout-failed-lookup.json",
+      "stderr": "stderr-unavailable.txt",
+      "exit_code": 1,
+      "note": "Recorded answer for an id that does not exist. yt-dlp says This video is unavailable."
+    },
+    {
+      "name": "channel_search_503",
+      "command": ["--flat-playlist", "-J", "--", "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q/search?query=Dar+E+Nijaat"],
+      "stderr": "stderr-search-503.txt",
+      "exit_code": 1,
+      "note": "Written by hand, not recorded: the shape of the yt-dlp error when YouTube answers a channel search with a 5xx."
+    },
+    {
+      "name": "channel_search_429",
+      "command": ["--flat-playlist", "-J", "--", "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q/search?query=Dar+E+Nijaat"],
+      "stderr": "stderr-search-429.txt",
+      "exit_code": 1,
+      "note": "Written by hand, not recorded: the shape of the yt-dlp error when YouTube rate limits a channel search."
+    }
+  ]
+}

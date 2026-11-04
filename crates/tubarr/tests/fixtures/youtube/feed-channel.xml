@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+  <link rel="self" href="http://www.youtube.com/feeds/videos.xml?channel_id=UC4JCksJF76g_MdzPVBJoC3Q"/>
+  <id>yt:channel:4JCksJF76g_MdzPVBJoC3Q</id>
+  <yt:channelId>4JCksJF76g_MdzPVBJoC3Q</yt:channelId>
+  <title>ARY Digital HD</title>
+  <link rel="alternate" href="https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q"/>
+  <author>
+    <name>ARY Digital HD</name>
+    <uri>https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q</uri>
+  </author>
+  <published>2014-05-21T09:41:12+00:00</published>
+  <entry>
+    <id>yt:video:Kx3mP0qLw8E</id>
+    <yt:videoId>Kx3mP0qLw8E</yt:videoId>
+    <yt:channelId>UC4JCksJF76g_MdzPVBJoC3Q</yt:channelId>
+    <title>Kabhi Main Kabhi Tum Episode 3 - Fahad Mustafa - Hania Aamir - 9th July 2024 - ARY Digital</title>
+    <link rel="alternate" href="https://www.youtube.com/watch?v=Kx3mP0qLw8E"/>
+    <author>
+      <name>ARY Digital HD</name>
+      <uri>https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q</uri>
+    </author>
+    <published>2024-07-09T15:00:09+00:00</published>
+    <updated>2026-10-15T08:12:01+00:00</updated>
+    <media:group>
+      <media:title>Kabhi Main Kabhi Tum Episode 3 - Fahad Mustafa - Hania Aamir - 9th July 2024 - ARY Digital</media:title>
+      <media:content url="https://www.youtube.com/v/Kx3mP0qLw8E?version=3" type="application/x-shockwave-flash" width="640" height="390"/>
+      <media:thumbnail url="https://i3.ytimg.com/vi/Kx3mP0qLw8E/hqdefault.jpg" width="480" height="360"/>
+      <media:description>Kabhi Main Kabhi Tum Episode 3 &amp; more dramas on ARY Digital.</media:description>
+      <media:community>
+        <media:starRating count="18234" average="5.00" min="1" max="5"/>
+        <media:statistics views="2210345"/>
+      </media:community>
+    </media:group>
+  </entry>
+  <entry>
+    <id>yt:video:bT7rN2vYc5A</id>
+    <yt:videoId>bT7rN2vYc5A</yt:videoId>
+    <yt:channelId>UC4JCksJF76g_MdzPVBJoC3Q</yt:channelId>
+    <title>Kabhi Main Kabhi Tum Episode 2 - Teaser - ARY Digital</title>
+    <link rel="alternate" href="https://www.youtube.com/watch?v=bT7rN2vYc5A"/>
+    <author>
+      <name>ARY Digital HD</name>
+      <uri>https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q</uri>
+    </author>
+    <published>2024-07-07T12:30:00+00:00</published>
+    <updated>2026-10-14T21:04:55+00:00</updated>
+    <media:group>
+      <media:title>Kabhi Main Kabhi Tum Episode 2 - Teaser - ARY Digital</media:title>
+      <media:content url="https://www.youtube.com/v/bT7rN2vYc5A?version=3" type="application/x-shockwave-flash" width="640" height="390"/>
+      <media:thumbnail url="https://i3.ytimg.com/vi/bT7rN2vYc5A/hqdefault.jpg" width="480" height="360"/>
+      <media:description>Watch the next episode on Tuesday at 8:00 PM.</media:description>
+      <media:community>
+        <media:starRating count="18234" average="5.00" min="1" max="5"/>
+        <media:statistics views="312877"/>
+      </media:community>
+    </media:group>
+  </entry>
+  <entry>
+    <id>yt:video:0eD-GQCutAU</id>
+    <yt:videoId>0eD-GQCutAU</yt:videoId>
+    <yt:channelId>UC4JCksJF76g_MdzPVBJoC3Q</yt:channelId>
+    <title>Kabhi Main Kabhi Tum Episode 1 - Fahad Mustafa - Hania Aamir - 2nd July 2024 - ARY Digital</title>
+    <link rel="alternate" href="https://www.youtube.com/watch?v=0eD-GQCutAU"/>
+    <author>
+      <name>ARY Digital HD</name>
+      <uri>https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q</uri>
+    </author>
+    <published>2024-07-02T15:00:12+00:00</published>
+    <updated>2026-10-15T02:47:30+00:00</updated>
+    <media:group>
+      <media:title>Kabhi Main Kabhi Tum Episode 1 - Fahad Mustafa - Hania Aamir - 2nd July 2024 - ARY Digital</media:title>
+      <media:content url="https://www.youtube.com/v/0eD-GQCutAU?version=3" type="application/x-shockwave-flash" width="640" height="390"/>
+      <media:thumbnail url="https://i3.ytimg.com/vi/0eD-GQCutAU/hqdefault.jpg" width="480" height="360"/>
+      <media:description>Kabhi Main Kabhi Tum Episode 1.</media:description>
+      <media:community>
+        <media:starRating count="18234" average="5.00" min="1" max="5"/>
+        <media:statistics views="9871234"/>
+      </media:community>
+    </media:group>
+  </entry>
+</feed>

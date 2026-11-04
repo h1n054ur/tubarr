@@ -1,0 +1,23 @@
+{
+  "page": 1,
+  "results": [
+    {
+      "adult": false,
+      "backdrop_path": null,
+      "genre_ids": [18],
+      "id": 211111,
+      "origin_country": ["PK"],
+      "original_language": "ur",
+      "original_name": "تیرے بن",
+      "overview": "Meerab and Murtasim are married against their will.",
+      "popularity": 12.3,
+      "poster_path": null,
+      "first_air_date": "2022-12-28",
+      "name": "Tere Bin",
+      "vote_average": 8.1,
+      "vote_count": 40
+    }
+  ],
+  "total_pages": 1,
+  "total_results": 1
+}

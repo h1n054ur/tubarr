@@ -1,0 +1,52 @@
+[package]
+name = "tubarr"
+version = "0.1.0"
+description = "YouTube as a source for Sonarr and Radarr"
+publish = false
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+argon2 = "0.6.0"
+axum = { version = "0.8.9", features = ["multipart"] }
+bytes = "1.12.1"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs"] }
+futures-util = "0.3.34"
+hex = "0.4.3"
+humantime-serde = "1.1.1"
+ipnet = { version = "2.12.2", features = ["serde"] }
+jiff = { version = "0.2.38", features = ["tzdb-bundle-always"] }
+lru = "0.18.5"
+nix = { version = "0.31.3", features = ["signal", "process", "user"] }
+openidconnect = { version = "4.0.1", default-features = false }
+rand = "0.10.3"
+regex = "1.13.1"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "http2", "json"] }
+roxmltree = "0.21.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+sqlx = { version = "0.9.0", default-features = false, features = ["sqlite-bundled", "runtime-tokio", "migrate", "macros", "json"] }
+tempfile = "3.27.0"
+thiserror = "2.0.21"
+time = { version = "0.3.55", features = ["formatting"] }
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "macros", "net", "signal", "process", "fs", "time", "sync"] }
+toml = "1.1.8"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+unicode-normalization = "0.1.25"
+url = { version = "2.5.8", features = ["serde"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[dev-dependencies]
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
+http-body-util = "0.1.5"
+quick-xml = "0.42.0"
+tokio = { version = "1.53.3", features = ["test-util"] }
+tower = { version = "0.5.3", features = ["util"] }

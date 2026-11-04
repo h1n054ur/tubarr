@@ -1,0 +1,190 @@
+{
+  "id": "UC4JCksJF76g_MdzPVBJoC3Q",
+  "channel": "ARY Digital HD",
+  "channel_id": "UC4JCksJF76g_MdzPVBJoC3Q",
+  "title": "ARY Digital HD - Videos",
+  "availability": null,
+  "channel_follower_count": 53100000,
+  "description": "ARY Digital is a Pakistani entertainment channel.",
+  "tags": [
+    "ARY Digital"
+  ],
+  "thumbnails": [],
+  "uploader_id": "@ARYDigitalasia",
+  "uploader_url": "https://www.youtube.com/@ARYDigitalasia",
+  "modified_date": null,
+  "view_count": null,
+  "playlist_count": null,
+  "uploader": "ARY Digital HD",
+  "channel_url": "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q",
+  "_type": "playlist",
+  "entries": [
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "Zq8uV4hNs1M",
+      "url": "https://www.youtube.com/watch?v=Zq8uV4hNs1M",
+      "title": "Kabhi Main Kabhi Tum Episode 4 - Fahad Mustafa - Hania Aamir - 16th July 2024 - ARY Digital",
+      "description": null,
+      "duration": 2131.0,
+      "channel_id": "UC4JCksJF76g_MdzPVBJoC3Q",
+      "channel": "ARY Digital HD",
+      "channel_url": "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q",
+      "uploader": "ARY Digital HD",
+      "uploader_id": "@ARYDigitalasia",
+      "uploader_url": "https://www.youtube.com/@ARYDigitalasia",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/Zq8uV4hNs1M/hqdefault.jpg",
+          "height": 202,
+          "width": 360
+        }
+      ],
+      "timestamp": 1721127600,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 1045,
+      "live_status": null,
+      "channel_is_verified": true,
+      "__x_forwarded_for_ip": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "Kx3mP0qLw8E",
+      "url": "https://www.youtube.com/watch?v=Kx3mP0qLw8E",
+      "title": "Kabhi Main Kabhi Tum Episode 3 - Fahad Mustafa - Hania Aamir - 9th July 2024 - ARY Digital",
+      "description": null,
+      "duration": 2098.0,
+      "channel_id": "UC4JCksJF76g_MdzPVBJoC3Q",
+      "channel": "ARY Digital HD",
+      "channel_url": "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q",
+      "uploader": "ARY Digital HD",
+      "uploader_id": "@ARYDigitalasia",
+      "uploader_url": "https://www.youtube.com/@ARYDigitalasia",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/Kx3mP0qLw8E/hqdefault.jpg",
+          "height": 202,
+          "width": 360
+        }
+      ],
+      "timestamp": 1720522800,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 2210345,
+      "live_status": null,
+      "channel_is_verified": true,
+      "__x_forwarded_for_ip": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "bT7rN2vYc5A",
+      "url": "https://www.youtube.com/watch?v=bT7rN2vYc5A",
+      "title": "Kabhi Main Kabhi Tum Episode 2 - Teaser - ARY Digital",
+      "description": null,
+      "duration": 61.0,
+      "channel_id": "UC4JCksJF76g_MdzPVBJoC3Q",
+      "channel": "ARY Digital HD",
+      "channel_url": "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q",
+      "uploader": "ARY Digital HD",
+      "uploader_id": "@ARYDigitalasia",
+      "uploader_url": "https://www.youtube.com/@ARYDigitalasia",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/bT7rN2vYc5A/hqdefault.jpg",
+          "height": 202,
+          "width": 360
+        }
+      ],
+      "timestamp": 1720296000,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 312877,
+      "live_status": null,
+      "channel_is_verified": true,
+      "__x_forwarded_for_ip": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "0eD-GQCutAU",
+      "url": "https://www.youtube.com/watch?v=0eD-GQCutAU",
+      "title": "Kabhi Main Kabhi Tum Episode 1 - Fahad Mustafa - Hania Aamir - 2nd July 2024 - ARY Digital",
+      "description": null,
+      "duration": 2101.0,
+      "channel_id": "UC4JCksJF76g_MdzPVBJoC3Q",
+      "channel": "ARY Digital HD",
+      "channel_url": "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q",
+      "uploader": "ARY Digital HD",
+      "uploader_id": "@ARYDigitalasia",
+      "uploader_url": "https://www.youtube.com/@ARYDigitalasia",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/0eD-GQCutAU/hqdefault.jpg",
+          "height": 202,
+          "width": 360
+        }
+      ],
+      "timestamp": 1719918000,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 9871234,
+      "live_status": null,
+      "channel_is_verified": true,
+      "__x_forwarded_for_ip": null
+    },
+    {
+      "_type": "url",
+      "ie_key": "Youtube",
+      "id": "Lm2pQ9rTt0B",
+      "url": "https://www.youtube.com/watch?v=Lm2pQ9rTt0B",
+      "title": "Sukoon Last Episode 46 - 25th April 2024 - ARY Digital",
+      "description": null,
+      "duration": 2302.0,
+      "channel_id": "UC4JCksJF76g_MdzPVBJoC3Q",
+      "channel": "ARY Digital HD",
+      "channel_url": "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q",
+      "uploader": "ARY Digital HD",
+      "uploader_id": "@ARYDigitalasia",
+      "uploader_url": "https://www.youtube.com/@ARYDigitalasia",
+      "thumbnails": [
+        {
+          "url": "https://i.ytimg.com/vi/Lm2pQ9rTt0B/hqdefault.jpg",
+          "height": 202,
+          "width": 360
+        }
+      ],
+      "timestamp": null,
+      "release_timestamp": null,
+      "availability": null,
+      "view_count": 15003221,
+      "live_status": null,
+      "channel_is_verified": true,
+      "__x_forwarded_for_ip": null
+    }
+  ],
+  "webpage_url": "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q/videos",
+  "original_url": "https://www.youtube.com/channel/UC4JCksJF76g_MdzPVBJoC3Q/videos",
+  "webpage_url_basename": "videos",
+  "webpage_url_domain": "youtube.com",
+  "extractor": "youtube:tab",
+  "extractor_key": "YoutubeTab",
+  "release_year": null,
+  "requested_entries": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "epoch": 1760600000,
+  "__files_to_move": {},
+  "_version": {
+    "version": "2026.08.19",
+    "current_git_head": null,
+    "release_git_head": "0000000000000000000000000000000000000000",
+    "repository": "yt-dlp/yt-dlp"
+  }
+}

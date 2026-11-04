@@ -1,0 +1,17 @@
+/target
+# local env files (machine settings, never committed)
+.*.env
+# local configs
+/tubarr.toml
+# demo stack state (scripts/demo.sh)
+/.demo
+# soak runs (scripts/soak)
+/.demo-soak
+
+# docs site (docs/, Astro Starlight)
+docs/node_modules/
+docs/dist/
+docs/.astro/
+
+# Python bytecode
+__pycache__/

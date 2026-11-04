@@ -1,0 +1,27 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "objectID": "series-424242",
+      "aliases": ["Tere Bin Drama"],
+      "country": "pak",
+      "id": "series-424242",
+      "image_url": "https://artworks.thetvdb.com/banners/v4/series/424242/posters/poster.jpg",
+      "name": "Tere Bin",
+      "first_air_time": "2022-12-28",
+      "overview": "Meerab and Murtasim are married against their will.",
+      "primary_language": "urd",
+      "primary_type": "series",
+      "status": "Ended",
+      "type": "series",
+      "tvdb_id": "424242",
+      "year": "2022",
+      "slug": "tere-bin",
+      "overviews": { "eng": "Meerab and Murtasim are married against their will." },
+      "translations": { "eng": "Tere Bin", "urd": "تیرے بن" },
+      "network": "Geo Entertainment",
+      "thumbnail": ""
+    }
+  ],
+  "links": { "prev": null, "self": "https://api4.thetvdb.com/v4/search?query=Tere%20Bin&type=series&page=0", "next": null, "total_items": 1, "page_size": 50 }
+}

@@ -1,0 +1,24 @@
+---
+title: Tubarr
+description: YouTube as a source for Sonarr and Radarr, played in Jellyfin without storing a thing.
+template: splash
+hero:
+  tagline: YouTube as a source for Sonarr and Radarr, played in Jellyfin without storing a thing.
+  actions:
+    - text: Install
+      link: getting-started/install/
+      icon: right-arrow
+    - text: Quick start
+      link: getting-started/quick-start/
+      variant: minimal
+---
+
+Tubarr makes YouTube a source for Sonarr and Radarr. To them it looks like an indexer (the Newznab API) and a download client (a SABnzbd-style API). Instead of downloading anything, a grab writes a small `.strm` link file and the video's captions as `.srt`. Sonarr or Radarr import those like any episode or film, and Jellyfin plays the link. At play time Tubarr looks up the YouTube stream and serves the video and audio tracks joined into one MP4, without re-encoding and without ffmpeg.
+
+It is meant for shows and films that official channels publish in full on YouTube, matched to the right episode by per-show rules. When a match is unclear it answers nothing and leaves a note instead.
+
+Tubarr works with Jellyfin. It does not work with Plex, because Plex does not play `.strm` files. Emby and Kodi play `.strm` files but have not been tried with Tubarr. See [Which media servers work](setup/jellyfin/#which-media-servers-work).
+
+Tubarr is pre-alpha. Config keys and APIs can still change between versions.
+
+Tubarr is not affiliated with YouTube, and running it goes against YouTube's terms. Please read [Terms and personal use](about/terms/) before you install it.

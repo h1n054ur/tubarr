@@ -1,0 +1,9 @@
+# Only the sources the Dockerfile copies matter, so keep the build context small.
+.git
+.forgejo
+target
+web/node_modules
+web/dist
+tubarr.toml
+.*.env
+__pycache__

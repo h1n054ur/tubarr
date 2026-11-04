@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:newznab="http://www.newznab.com/DTD/2010/feeds/attributes/">
+  <channel>
+    <title>Tubarr</title>
+    <description>Tubarr feed</description>
+    <newznab:response offset="0" total="1" />
+    <item>
+      <title>Theri.2016.1080p.WEB-DL.AAC2.0.H.264.HINDI-TUBARR</title>
+      <guid isPermaLink="false">tubarr-ldmPWRb-XcM</guid>
+      <link>http://tubarr:9797/api?t=get&amp;id=ldmPWRb-XcM&amp;apikey=0123456789abcdef0123456789abcdef</link>
+      <pubDate>Fri, 15 Mar 2019 12:00:00 +0000</pubDate>
+      <category>Movies &gt; HD</category>
+      <enclosure url="http://tubarr:9797/api?t=get&amp;id=ldmPWRb-XcM&amp;apikey=0123456789abcdef0123456789abcdef" length="0" type="application/x-nzb" />
+      <newznab:attr name="category" value="2000" />
+      <newznab:attr name="category" value="2040" />
+      <newznab:attr name="tmdbid" value="200001" />
+      <newznab:attr name="imdb" value="0000001" />
+      <newznab:attr name="language" value="Hindi" />
+    </item>
+  </channel>
+</rss>

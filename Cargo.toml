@@ -1,0 +1,21 @@
+[workspace]
+resolver = "3"
+members = ["crates/tubarr"]
+
+[workspace.package]
+edition = "2024"
+license = "AGPL-3.0-only"
+rust-version = "1.99"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+# Password hashing is deliberately slow, and unoptimised it takes seconds per hash in tests.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3

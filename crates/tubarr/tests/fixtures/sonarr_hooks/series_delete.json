@@ -1,0 +1,29 @@
+{
+  "eventType": "SeriesDelete",
+  "instanceName": "Sonarr",
+  "applicationUrl": "",
+  "series": {
+    "id": 17,
+    "title": "Kabhi Main Kabhi Tum",
+    "titleSlug": "kabhi-main-kabhi-tum",
+    "path": "/mnt/fk/data/media/pk-dramas/Kabhi Main Kabhi Tum (2024)",
+    "tvdbId": 452001,
+    "tvMazeId": 0,
+    "tmdbId": 0,
+    "imdbId": "",
+    "type": "standard",
+    "year": 2024,
+    "genres": [
+      "Drama"
+    ],
+    "images": [],
+    "tags": [
+      "youtube"
+    ],
+    "originalLanguage": {
+      "id": 1,
+      "name": "English"
+    }
+  },
+  "deletedFiles": true
+}

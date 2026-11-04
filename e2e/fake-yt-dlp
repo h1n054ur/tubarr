@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""A stand-in for yt-dlp: answers --version, a flat channel listing and a -J video lookup from the
+end-to-end catalog (TUBARR_E2E_CATALOG), with format URLs on the fake YouTube (TUBARR_E2E_YT)."""
+
+import json
+import os
+import re
+import sys
+import time
+from datetime import datetime, timezone
+
+args = sys.argv[1:]
+if "--version" in args:
+    print("2026.10.10")
+    sys.exit(0)
+
+with open(os.environ["TUBARR_E2E_CATALOG"], encoding="utf-8") as f:
+    videos = json.load(f)["videos"]
+base = os.environ["TUBARR_E2E_YT"].rstrip("/")
+target = args[-1]
+log = os.environ.get("TUBARR_E2E_YTDLP_LOG")
+if log:
+    with open(log, "a", encoding="utf-8") as f:
+        f.write(json.dumps(args) + "\n")
+
+m = re.search(r"/channel/([\w-]+)/videos$", target)
+if "--flat-playlist" in args and m:
+    entries = [
+        {"id": v["id"], "title": v["title"], "duration": v["duration"], "timestamp": v["published"]}
+        for v in sorted(videos, key=lambda v: v["published"], reverse=True)
+        if v["channel_id"] == m.group(1)
+    ]
+    print(json.dumps({"id": m.group(1), "channel_id": m.group(1), "entries": entries}))
+    sys.exit(0)
+
+m = re.search(r"watch\?v=([\w-]{11})$", target)
+video = next((v for v in videos if m and v["id"] == m.group(1)), None)
+if video is None:
+    sys.stderr.write(f"ERROR: [youtube] {target}: Video unavailable\n")
+    sys.exit(1)
+
+expire = int(time.time()) + 5 * 3600
+media_dir = os.environ["TUBARR_E2E_MEDIA"]
+
+
+def fmt(fid, name, video_track):
+    return {
+        "format_id": fid,
+        "url": f"{base}/media/{name}?expire={expire}&id={video['id']}",
+        "ext": "mp4",
+        "protocol": "https",
+        "vcodec": "avc1.640028" if video_track else "none",
+        "acodec": "none" if video_track else "mp4a.40.2",
+        "width": 1920 if video_track else None,
+        "height": 1080 if video_track else None,
+        "filesize": os.path.getsize(os.path.join(media_dir, name)),
+        "http_headers": {"User-Agent": "Mozilla/5.0"},
+    }
+
+
+subs = {
+    lang: [{"ext": "vtt", "url": f"{base}/subs/{video['id']}.{lang}.vtt"}]
+    for lang in video.get("subs", [])
+}
+print(json.dumps({
+    "id": video["id"],
+    "title": video["title"],
+    "duration": video["duration"],
+    "upload_date": datetime.fromtimestamp(video["published"], timezone.utc).strftime("%Y%m%d"),
+    "channel_id": video["channel_id"],
+    "formats": [fmt("140", video["audio"], False), fmt("137", video["video"], True)],
+    "subtitles": subs,
+    "automatic_captions": {},
+}))

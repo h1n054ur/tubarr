@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+
+/* Brand palette from the Tubarr brand set (tubarr-palette.css, copied as is): dark by default, light
+ * with prefers-color-scheme or data-theme="light". Components use only the theme names below
+ * (bg-canvas, text-ink, bg-brand, text-brand-text...), never raw colours. */
+@import './brand/tubarr-palette.css';
+
+@theme inline {
+  --font-sans: 'Lexend', ui-sans-serif, system-ui, sans-serif;
+  --color-canvas: var(--tubarr-bg);
+  --color-surface: var(--tubarr-surface);
+  --color-surface-2: var(--tubarr-surface-2);
+  --color-ink: var(--tubarr-text);
+  --color-muted: var(--tubarr-text-secondary);
+  --color-line: var(--tubarr-border);
+  --color-brand: var(--tubarr-primary);
+  --color-brand-dark: var(--tubarr-primary-strong);
+  --color-brand-text: var(--tubarr-primary-text);
+  --color-on-brand: var(--tubarr-on-primary);
+  --color-accent: var(--tubarr-secondary-text);
+}
