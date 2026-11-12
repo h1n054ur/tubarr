@@ -11,7 +11,9 @@ enabled = true
 token_file = "/run/secrets/metrics_token"   # sent as Authorization: Bearer
 ```
 
-Without `token_file` the API key (`api_key_file`) is the token. With neither, only clients `[auth] play_allowed_networks` lets through may scrape, the same rule as `/play`. A scrape costs no YouTube lookups: it reads counters, counts the rows of three tables and lists the sample table folder. The keys are listed under [`[metrics]`](../../setup/configuration/#metrics). For notices to Discord or a webhook instead, see [`[notify]`](../../setup/configuration/#notify).
+Without `token_file` the API key (`api_key_file`) is the token. With neither, only clients `[auth] play_allowed_networks` lets through may scrape, the same rule as `/play`. A configured trusted proxy must supply a usable `X-Forwarded-For` chain with a non-trusted client in an allowed network. A missing header, an unusable chain or only trusted hops gets a 403, even if the proxy has a private address. This identity rule does not change scrapes authenticated by a metrics token or API key.
+
+A scrape costs no YouTube lookups: it reads counters, counts the rows of three tables and lists the sample table folder. The keys are listed under [`[metrics]`](../../setup/configuration/#metrics). For notices to Discord or a webhook instead, see [`[notify]`](../../setup/configuration/#notify).
 
 ```yaml
 scrape_configs:

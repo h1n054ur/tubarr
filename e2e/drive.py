@@ -7,9 +7,12 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
+
+from evidence import directory, output_fd, redact_text, run_secrets, serialize
 
 WORK = os.environ["E2E_WORK"]
 EVIDENCE = os.environ["E2E_EVIDENCE"]
@@ -48,14 +51,16 @@ def call(base, path, api_key, method="GET", body=None, headers=None, raw=False, 
 
 
 def save(name, value):
-    with open(os.path.join(EVIDENCE, name), "w", encoding="utf-8") as f:
-        if isinstance(value, (bytes, str)):
-            f.write(value if isinstance(value, str) else value.decode("utf-8", "replace"))
-        else:
-            json.dump(value, f, indent=2)
+    text = serialize(value, run_secrets(WORK))
+    with directory(EVIDENCE, create=True) as parent:
+        with open(os.path.join(EVIDENCE, name), "w", encoding="utf-8",
+                  opener=lambda path, flags: output_fd(parent, name)) as f:
+            f.write(text)
 
 
 def step(name, ok, detail=""):
+    secrets = run_secrets(WORK)
+    name, detail = redact_text(name, secrets), redact_text(str(detail), secrets)
     results.append({"step": name, "ok": bool(ok), "detail": detail})
     print(f"{'PASS' if ok else 'FAIL'} {name}{': ' + detail if detail else ''}", flush=True)
     return ok
@@ -72,7 +77,7 @@ def wait_for(what, check, timeout=240, every=3):
         except (urllib.error.URLError, ConnectionError, TimeoutError, json.JSONDecodeError):
             last = None
         time.sleep(every)
-    print(f"timed out waiting for {what}", flush=True)
+    print(redact_text(f"timed out waiting for {what}", run_secrets(WORK)), flush=True)
     return None
 
 
@@ -124,16 +129,21 @@ def setup_arr(arr, root, categories, client_category, tubarr_key):
 
 
 def main():
-    sonarr = Arr("sonarr", os.environ["E2E_SONARR"])
-    radarr = Arr("radarr", os.environ["E2E_RADARR"])
-    tubarr_key = key("tubarr")
+    sonarr = radarr = None
     try:
+        sonarr = Arr("sonarr", os.environ["E2E_SONARR"])
+        radarr = Arr("radarr", os.environ["E2E_RADARR"])
+        tubarr_key = key("tubarr")
         run(sonarr, radarr, tubarr_key)
     except Exception as e:  # noqa: BLE001 - every failure becomes a FAIL line with evidence
         step("driver", False, f"{type(e).__name__}: {e}")
     finally:
-        collect(sonarr, radarr)
-        save("results.json", results)
+        try:
+            collect(sonarr, radarr)
+        except Exception as error:
+            step("collection", False, f"{type(error).__name__}: {error}")
+        finally:
+            save("results.json", results)
     sys.exit(0 if results and all(r["ok"] for r in results) else 1)
 
 
@@ -282,8 +292,9 @@ def play_check(name, url, tubarr_key):
             bad += 1
     ok = ok and bad == 0
     detail.append(f"{len(ranges)} ranges, {bad} bad")
-    path = os.path.join(EVIDENCE, f"play-{ids[0]}.mp4")
-    with open(path, "wb") as f:
+    # Binary media is private run data, never an uploaded failure artifact.
+    with tempfile.NamedTemporaryFile(dir=WORK, prefix="play-", suffix=".mp4", delete=False) as f:
+        path = f.name
         f.write(full)
     probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
                             "format=duration:stream=codec_name", "-of", "json", url],
@@ -302,6 +313,8 @@ def play_check(name, url, tubarr_key):
 
 def collect(sonarr, radarr):
     for arr in (sonarr, radarr):
+        if arr is None:
+            continue
         for name, path in [("history", "/history?pageSize=100&sortKey=date&sortDirection=descending"),
                            ("queue", "/queue?includeUnknownSeriesItems=true"),
                            ("indexers", "/indexer"), ("clients", "/downloadclient"),

@@ -832,6 +832,179 @@ async fn play_believes_forwarded_for_only_from_trusted_proxies() {
     assert_ne!(through.status, StatusCode::FORBIDDEN);
 }
 
+const PROXY_AUTH: &str = "[auth]\ntrusted_proxies = [\"172.16.0.2/32\", \"172.16.0.3/32\"]\n";
+
+async fn proxy_play_status(k: &Kit, peer: &str, forwarded: &[&str]) -> StatusCode {
+    let mut request = call("GET", "/play/not-an-id").peer(peer);
+    for value in forwarded {
+        request = request.header("x-forwarded-for", *value);
+    }
+    request.send(&k.app).await.status
+}
+
+#[tokio::test]
+async fn trusted_proxy_without_client_identity_cannot_play() {
+    let k = kit(PROXY_AUTH).await;
+    for method in ["GET", "HEAD"] {
+        for path in ["/play/not-an-id", "/play/not-an-id/audio"] {
+            let reply = call(method, path)
+                .peer("172.16.0.2:4000")
+                .send(&k.app)
+                .await;
+            assert_eq!(reply.status, StatusCode::FORBIDDEN, "{method} {path}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn trusted_proxy_with_invalid_or_empty_xff_cannot_play() {
+    let k = kit(PROXY_AUTH).await;
+    for values in [
+        vec![""],
+        vec![" "],
+        vec!["nope"],
+        vec!["192.168.1.20,"],
+        vec!["192.168.1.20, , 172.16.0.3"],
+        vec!["192.168.1.20", "nope, 172.16.0.3"],
+        vec!["192.168.1.20", ""],
+    ] {
+        assert_eq!(
+            proxy_play_status(&k, "172.16.0.2:4000", &values).await,
+            StatusCode::FORBIDDEN,
+            "{values:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn all_trusted_xff_chain_cannot_play() {
+    let k = kit(PROXY_AUTH).await;
+    for values in [
+        vec!["172.16.0.3"],
+        vec!["172.16.0.2, 172.16.0.3"],
+        vec!["172.16.0.2", "172.16.0.3"],
+        vec!["::ffff:172.16.0.3"],
+    ] {
+        assert_eq!(
+            proxy_play_status(&k, "172.16.0.2:4000", &values).await,
+            StatusCode::FORBIDDEN,
+            "{values:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn trusted_proxy_uses_rightmost_untrusted_hop() {
+    let k = kit(PROXY_AUTH).await;
+    for chain in [
+        "192.168.1.20, 203.0.113.7, 172.16.0.3",
+        "nope, 203.0.113.7, 172.16.0.3",
+    ] {
+        assert_eq!(
+            proxy_play_status(&k, "172.16.0.2:4000", &[chain]).await,
+            StatusCode::FORBIDDEN,
+            "{chain}"
+        );
+    }
+    for chain in [
+        "203.0.113.7, 192.168.1.20, 172.16.0.3",
+        "nope, 192.168.1.20, 172.16.0.3",
+        ", 192.168.1.20, 172.16.0.3",
+    ] {
+        assert_eq!(
+            proxy_play_status(&k, "172.16.0.2:4000", &[chain]).await,
+            StatusCode::NOT_FOUND,
+            "{chain}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn trusted_proxy_respects_repeated_xff_fields() {
+    let k = kit(PROXY_AUTH).await;
+    assert_eq!(
+        proxy_play_status(
+            &k,
+            "172.16.0.2:4000",
+            &["192.168.1.20, 203.0.113.7", "172.16.0.3"]
+        )
+        .await,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        proxy_play_status(
+            &k,
+            "172.16.0.2:4000",
+            &["203.0.113.7", "192.168.1.20, 172.16.0.3"]
+        )
+        .await,
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn trusted_proxy_canonicalizes_ipv4_mapped_peer_and_hops() {
+    let k = kit(PROXY_AUTH).await;
+    let peer = "[::ffff:172.16.0.2]:4000";
+    assert_eq!(
+        proxy_play_status(&k, peer, &[]).await,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        proxy_play_status(&k, peer, &["::ffff:172.16.0.3"]).await,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        proxy_play_status(&k, peer, &["::ffff:203.0.113.7, ::ffff:172.16.0.3"]).await,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        proxy_play_status(&k, peer, &["::ffff:192.168.1.20, ::ffff:172.16.0.3"]).await,
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn untrusted_peer_cannot_spoof_private_xff() {
+    let k = kit(PROXY_AUTH).await;
+    assert_eq!(
+        proxy_play_status(&k, "203.0.113.7:4000", &["192.168.1.20", "172.16.0.3"]).await,
+        StatusCode::FORBIDDEN
+    );
+}
+
+#[tokio::test]
+async fn direct_private_jellyfin_needs_no_xff() {
+    let k = kit(PROXY_AUTH).await;
+    for peer in ["192.168.1.20:4000", "[::ffff:192.168.1.20]:4000"] {
+        assert_eq!(
+            proxy_play_status(&k, peer, &[]).await,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            proxy_play_status(&k, peer, &["nope"]).await,
+            StatusCode::NOT_FOUND,
+            "an untrusted direct peer ignores XFF"
+        );
+    }
+}
+
+#[tokio::test]
+async fn local_bypass_never_uses_unidentified_trusted_proxy() {
+    let k = kit(&format!("{PROXY_AUTH}local_bypass = true\n")).await;
+    for values in [vec![], vec![""], vec!["nope"], vec!["172.16.0.3"]] {
+        let mut request = call("GET", "/admin/api/mappings").peer("172.16.0.2:4000");
+        for value in &values {
+            request = request.header("x-forwarded-for", *value);
+        }
+        assert_eq!(
+            request.send(&k.app).await.status,
+            StatusCode::UNAUTHORIZED,
+            "{values:?}"
+        );
+    }
+}
+
 #[tokio::test]
 async fn users_are_managed_and_the_last_admin_stays() {
     let k = kit("").await;

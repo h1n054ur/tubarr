@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Rust checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Install Rust (version from rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Licences and advisories (cargo-deny)
+        env:
+          DENY_VERSION: "0.20.2"
+          DENY_SHA256: 9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f
+        run: |
+          set -euo pipefail
+          name="cargo-deny-${DENY_VERSION}-x86_64-unknown-linux-musl"
+          curl -fsSL -o /tmp/cargo-deny.tar.gz \
+            "https://github.com/EmbarkStudios/cargo-deny/releases/download/${DENY_VERSION}/${name}.tar.gz"
+          echo "${DENY_SHA256}  /tmp/cargo-deny.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/cargo-deny.tar.gz -C /tmp --strip-components=1 "${name}/cargo-deny"
+          /tmp/cargo-deny --locked check advisories licenses bans sources
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy --all-targets --locked -- -D warnings
+      - name: Test
+        run: cargo test --all --locked
+
+  web:
+    name: Web checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Licences (npm packages)
+        run: bun scripts/licenses.ts check
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run build
+
+  harness:
+    name: Harness checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.2
+      - name: Lifecycle regressions (fake services)
+        run: python3 -m unittest discover -s e2e -p test_state.py -v
+      - name: Evidence regressions (fake services)
+        run: python3 -m unittest discover -s e2e -p test_artifacts.py -v
+      - name: Workflow policy
+        run: bun test scripts/check-workflows.test.ts

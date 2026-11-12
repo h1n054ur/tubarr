@@ -2,6 +2,22 @@
 
 All notable changes to Tubarr are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [semantic versioning](https://semver.org), on 0.x until 1.0 (see [the upgrade docs](https://h1n054ur.github.io/tubarr/operations/backups-and-upgrades/#versions)).
 
+## [0.1.1] - 2026-11-12
+
+### Fixed
+
+- Playback validates the full Content-Range and bounds reads to the requested and returned byte span before appending data.
+- Requests through configured trusted proxies are rejected when the forwarded chain does not establish an untrusted client address.
+- Managed binary installation has separate limits for downloads, extracted binaries and checksum files, while keeping staging and rollback.
+- E2E runs use per-user state and owned Docker resources, reject overlapping runs by the same user and support recovery after KEEP or interrupted cleanup.
+- Public pull requests get unprivileged checks. Image publication requires tests and E2E checks for the exact commit being released, and public E2E failure artifacts remove generated credentials, including encoded URL forms.
+- Eligible podcast uploads awaiting metadata leave unsure notes instead of being silently skipped or marked not wanted.
+- Unmatched-note replacement takes SQLite write intent before reading, avoiding a stale-snapshot failure when another connection writes.
+
+### Known limitations
+
+- Bundled SQLite 3.51.3 (libsqlite3-sys 0.37.0 via SQLx 0.9.0) remains vulnerable to [RUSTSEC-2026-0459](https://rustsec.org/advisories/RUSTSEC-2026-0459). A crafted database and sibling WAL file with differing page sizes can expose process memory. This release accepts that risk with a specific audit exception pending a compatible official SQLx fix. Keep database files, WAL files, storage and backups trusted, and never restore untrusted database files. Normal mapping JSON imports are metadata, not raw database uploads. See [SECURITY.md](SECURITY.md).
+
 ## [0.1.0] - 2026-11-04
 
 The first public release. It covers everything built so far.

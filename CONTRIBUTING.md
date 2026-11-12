@@ -48,7 +48,17 @@ curl -H @"$HOME/.tubarr-header" http://localhost:8480/api/health   # JSON: binar
 
 The key goes in a header file so it stays out of the process list, where anyone on the host could read it. For a local run, point `data_dir` somewhere writable.
 
-Please run these before you open a pull request: `cargo fmt --all --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test --all` for the service, and `bun run typecheck` and `bun run test` in `web/` for the UI. The same checks, plus the licence and advisory checks below, run in the project's CI before a change is merged.
+Please run these before you open a pull request: `cargo fmt --all --check`, `cargo clippy --all-targets --locked -- -D warnings` and `cargo test --all --locked` for the service, and `bun run typecheck`, `bun run test` and `bun run build` in `web/`. Public pull requests run read-only Rust checks, Web checks and Harness checks on hosted runners, without repository secrets. Rust checks include the licence and advisory checks below. Web checks use the frozen lockfile and check package licences.
+
+Harness checks run offline fake-service lifecycle and evidence regressions, plus workflow checks:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s e2e -p test_state.py -v
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s e2e -p test_artifacts.py -v
+bun test scripts/check-workflows.test.ts
+```
+
+These do not run Docker or prove real end-to-end behavior. Public image publication requires the same commit's core checks and hosted Real E2E job to pass first, including on release dry runs. Real E2E builds the source binary and uses Docker with real Sonarr and Radarr metadata lookups. Unavailable metadata keeps that gate failing.
 
 ## See your change on demo data
 
@@ -70,7 +80,11 @@ e2e/run.sh /path/to/evidence     # PASS or FAIL per step, exit 0 only when all p
 KEEP=1 e2e/run.sh                # leave it running for a look, then: e2e/run.sh down
 ```
 
-It needs Docker, Python 3, ffmpeg and internet access for the arrs' TVDB and TMDB lookups. The evidence folder (default `target/e2e-evidence`) gets the arr history, queue and files, Tubarr's log, mappings and health, the Newznab answers and every fake yt-dlp call. API keys stay in files under the temp folder and are left out of the evidence. It is worth running for changes to the indexer, download client, grab or `/play` code.
+It needs Docker, Python 3, ffmpeg and internet access for the arrs' TVDB and TMDB lookups. The evidence folder (default `target/e2e-evidence`) contains selected textual API responses, results, bounded service logs and `lifecycle.json` with the original exit status. Generated API keys and their encoded forms are redacted before evidence is written or details reach the console. If credential sources cannot be read safely, terminal service inspection and log collection stop. The original failure status and cleanup still apply.
+
+The hosted release job uploads only the selected sanitized evidence folder on failure or cancellation, retained for three days. It does not upload on success or include raw work directories, configs, databases, key files or binary playback captures. Collection runs before teardown, but cannot be guaranteed after SIGKILL.
+
+State and work live under `$XDG_STATE_HOME/tubarr/e2e`, or `$HOME/.local/state/tubarr/e2e` when XDG state home is unset or relative. Application directories must be owned by you with mode 0700, and lifecycle files use mode 0600. Overlapping runs and `down` during an active run fail promptly with exit 75. A retained run also blocks a new start. `KEEP=1` retains a run only once the driver has started, including a driver failure, not a setup failure or interruption. After KEEP or an abrupt exit, use `e2e/run.sh down` to recover. Cleanup checks every resource's ownership before removing any, and keeps state if cleanup fails so you can retry. It never reads the old temporary state file. The offline harness checks above do not replace the real end-to-end check, which is worth running for changes to the indexer, download client, grab or `/play` code.
 
 `scripts/soak/run.sh [workers] [minutes]` is a short soak on the demo stack, described under [Monitoring](https://h1n054ur.github.io/tubarr/operations/monitoring/).
 
@@ -91,7 +105,7 @@ It needs Docker, Python 3, ffmpeg and internet access for the arrs' TVDB and TMD
 | `crates/tubarr/src/auth` | sign-in: users, sessions, password and OpenID Connect login, the `[auth]` config |
 | `crates/tubarr/migrations` | SQL migrations, embedded in the binary |
 | `crates/tubarr/tests` | integration tests against the router and the store |
-| `.github/workflows` | `docs.yml`, which builds and publishes the docs site |
+| `.github/workflows` | public core checks, gated releases and docs publication |
 | `deny.toml`, `web/scripts/licenses.ts` | the licences allowed for Rust crates and npm packages, checked in CI |
 | `scripts/soak` | a short soak on the demo stack: concurrent plays and searches, `/metrics` sampled into a CSV |
 | `scripts/notices` | the header and cargo-about setup for the image's third-party notices |

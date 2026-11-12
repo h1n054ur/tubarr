@@ -117,6 +117,152 @@ async fn database_from_an_older_release_gets_the_newer_migrations() {
     assert_eq!(applied, i64::try_from(total).unwrap());
 }
 
+const RELEASED_FIXTURE: &[u8] = include_bytes!("fixtures/migrations/v0.1.0.sqlite3");
+const RELEASED_FIXTURE_SHA256: &str =
+    "618a8d1f610c62dec7d8481c8631c21a0b44678dcc0788941f9ee0212b472dac";
+
+fn released_fixture(dir: &std::path::Path) -> std::path::PathBuf {
+    use sha2::{Digest, Sha256};
+
+    assert_eq!(
+        hex::encode(Sha256::digest(RELEASED_FIXTURE)),
+        RELEASED_FIXTURE_SHA256
+    );
+    let provenance: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/migrations/v0.1.0.json")).unwrap();
+    assert_eq!(provenance["fixture_sha256"], RELEASED_FIXTURE_SHA256);
+    assert_eq!(
+        provenance["source_commit"],
+        "e1d9c199b32e52a24b6c5a8dd03bcd8a00d295f9"
+    );
+    assert_eq!(provenance["migrations"].as_array().unwrap().len(), 39);
+    let path = dir.join("tubarr.db");
+    std::fs::write(&path, RELEASED_FIXTURE).unwrap();
+    path
+}
+
+async fn released_fixture_rows(pool: &sqlx::SqlitePool) -> Vec<Vec<String>> {
+    let mut result = Vec::new();
+    for sql in [
+        "SELECT json_array(id, title, language, tvdb_id) FROM mappings ORDER BY id",
+        "SELECT json_array(video_id, season, episode, height) FROM releases ORDER BY id",
+        "SELECT json_array(video_id, season, episode) FROM pins ORDER BY id",
+        "SELECT json_array(nzo_id, status, storage_path) FROM grabs ORDER BY nzo_id",
+        "SELECT json_array(video_id, state, reason, ignored) FROM unmatched ORDER BY id",
+        "SELECT json_array(video_id) FROM released_videos ORDER BY video_id",
+    ] {
+        result.push(sqlx::query_scalar(sql).fetch_all(pool).await.unwrap());
+    }
+    result
+}
+
+fn released_fixture_backups(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x == "bak"))
+        .collect()
+}
+
+#[tokio::test]
+async fn released_database_fixture_upgrades_without_losing_rows() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = released_fixture(dir.path());
+    let old =
+        sqlx::SqlitePool::connect_with(sqlx::sqlite::SqliteConnectOptions::new().filename(&path))
+            .await
+            .unwrap();
+    let rows = released_fixture_rows(&old).await;
+    assert_eq!(
+        rows.iter().map(Vec::len).collect::<Vec<_>>(),
+        [1, 1, 1, 1, 1, 2]
+    );
+    let historical: Vec<(i64, Vec<u8>, bool)> =
+        sqlx::query_as("SELECT version, checksum, success FROM _sqlx_migrations ORDER BY version")
+            .fetch_all(&old)
+            .await
+            .unwrap();
+    let provenance: serde_json::Value =
+        serde_json::from_str(include_str!("fixtures/migrations/v0.1.0.json")).unwrap();
+    for ((version, checksum, success), expected) in historical
+        .iter()
+        .zip(provenance["migrations"].as_array().unwrap())
+    {
+        assert_eq!(Some(*version), expected["version"].as_i64());
+        assert_eq!(hex::encode(checksum), expected["sha384"].as_str().unwrap());
+        assert!(*success);
+    }
+    old.close().await;
+
+    let migrations = sqlx::migrate!();
+    let total = migrations.iter().count();
+    // This batch has no migration. A future upgrade must keep this released fixture unchanged.
+    let pending = total > historical.len();
+    let db = Db::open(&path).await.unwrap();
+    assert_eq!(released_fixture_rows(db.pool()).await, rows);
+    let applied: Vec<(i64, Vec<u8>, bool)> =
+        sqlx::query_as("SELECT version, checksum, success FROM _sqlx_migrations ORDER BY version")
+            .fetch_all(db.pool())
+            .await
+            .unwrap();
+    assert_eq!(applied.len(), total);
+    for (version, checksum, success) in &applied {
+        let migration = migrations.iter().find(|m| m.version == *version).unwrap();
+        assert_eq!(checksum.as_slice(), migration.checksum.as_ref());
+        assert!(*success);
+    }
+    assert_eq!(&applied[..historical.len()], historical.as_slice());
+    let copies = released_fixture_backups(dir.path());
+    assert_eq!(copies.len(), usize::from(pending));
+    if let Some(copy) = copies.first() {
+        let backup = sqlx::SqlitePool::connect_with(
+            sqlx::sqlite::SqliteConnectOptions::new()
+                .filename(copy)
+                .read_only(true),
+        )
+        .await
+        .unwrap();
+        assert_eq!(released_fixture_rows(&backup).await, rows);
+        let count: i64 = sqlx::query_scalar("SELECT count(*) FROM _sqlx_migrations")
+            .fetch_one(&backup)
+            .await
+            .unwrap();
+        assert_eq!(count, 39);
+        backup.close().await;
+    }
+    db.pool().close().await;
+    let reopened = Db::open(&path).await.unwrap();
+    assert_eq!(released_fixture_rows(reopened.pool()).await, rows);
+    assert_eq!(released_fixture_backups(dir.path()).len(), copies.len());
+    reopened.pool().close().await;
+}
+
+#[tokio::test]
+async fn released_database_fixture_rejects_rewritten_migration_checksums() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = released_fixture(dir.path());
+    let pool =
+        sqlx::SqlitePool::connect_with(sqlx::sqlite::SqliteConnectOptions::new().filename(&path))
+            .await
+            .unwrap();
+    sqlx::query("UPDATE _sqlx_migrations SET checksum = zeroblob(48) WHERE version = 1")
+        .execute(&pool)
+        .await
+        .unwrap();
+    pool.close().await;
+    let error = Db::open(&path).await.unwrap_err();
+    assert!(
+        matches!(error, tubarr::store::StoreError::Migrate(_)),
+        "{error}"
+    );
+    // The store backs up pending upgrades before SQLx validates historical checksums.
+    let pending = sqlx::migrate!().iter().count() > 39;
+    assert_eq!(
+        released_fixture_backups(dir.path()).len(),
+        usize::from(pending)
+    );
+}
+
 #[tokio::test]
 async fn raw_heights_become_resolution_labels() {
     let dir = tempfile::tempdir().unwrap();

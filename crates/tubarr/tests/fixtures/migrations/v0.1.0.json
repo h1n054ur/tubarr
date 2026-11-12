@@ -1,0 +1,218 @@
+{
+  "release": "v0.1.0",
+  "annotated_tag_object": "95a61a7886343ffc48c0485ce57e7a4715db25f1",
+  "tag_reference": "https://api.github.com/repos/h1n054ur/tubarr/git/tags/95a61a7886343ffc48c0485ce57e7a4715db25f1",
+  "source_repository": "https://github.com/h1n054ur/tubarr",
+  "source_commit": "e1d9c199b32e52a24b6c5a8dd03bcd8a00d295f9",
+  "source_archive": "https://codeload.github.com/h1n054ur/tubarr/tar.gz/e1d9c199b32e52a24b6c5a8dd03bcd8a00d295f9",
+  "archive_sha256": "58b80c1f15febcf3ecbd6c285ebba501fb29938b88fc10120a9d30850bab2f7d",
+  "fixture": "v0.1.0.sqlite3",
+  "fixture_sha256": "618a8d1f610c62dec7d8481c8631c21a0b44678dcc0788941f9ee0212b472dac",
+  "generation": "Python sqlite3 executes only the 39 SQL files from the public release archive in filename order. SQLx 0.9.0 migrate.rs metadata schema, SHA-384 of each original SQL byte sequence, fixed installed_on and zero execution_time. Insert the synthetic SQL below, integrity/foreign-key check, commit, VACUUM, close. Never regenerate this baseline for a future migration.",
+  "data": "Synthetic rows only. No users, sessions, API credentials, private URLs or live database data.",
+  "no_op_at_contract": "All 39 released migrations match this batch. Db::open is currently a no-op schema upgrade. Older migration transformation tests remain required. Future pending migrations must create one pre-upgrade backup without rewriting this fixture.",
+  "synthetic_seed_sql": [
+    "INSERT INTO mappings (id, kind, tvdb_id, title, language, created_at, updated_at) VALUES (1, 'show', 900001, 'Synthetic released show', 'English', 100, 100)",
+    "INSERT INTO releases (mapping_id, video_id, season, episode, video_title, language, height, published_at, created_at) VALUES (1, 'synthetic01', 1, 1, 'Synthetic episode', 'English', 1080, 100, 100)",
+    "INSERT INTO pins (mapping_id, season, episode, video_id, created_at) VALUES (1, 1, 2, 'synthetic02', 100)",
+    "INSERT INTO grabs (nzo_id, release_name, video_id, category, status, storage_path, created_at) VALUES ('synthetic-grab', 'Synthetic episode', 'synthetic01', 'tv', 'completed', '/synthetic/downloads', 100)",
+    "INSERT INTO unmatched (mapping_id, video_id, state, season, episode, reason, ignored, created_at, updated_at) VALUES (1, 'synthetic03', 'unsure', 1, 3, 'Synthetic uncertainty', 1, 100, 100)"
+  ],
+  "migrations": [
+    {
+      "file": "0001_initial.sql",
+      "version": 1,
+      "sha384": "71903e04db840f4373f68f41b198a0a1dbad7656232097f87a49c9cc5f46df806b9318b5cabf47ffe954d6284a12bbcb"
+    },
+    {
+      "file": "0002_videos.sql",
+      "version": 2,
+      "sha384": "7f568a678fb6c05630dc99a91cb991a3a8c083acfeaed7a73072fa905a353b6b88bc20229f1faa1465f7c185f1786ce7"
+    },
+    {
+      "file": "0003_releases.sql",
+      "version": 3,
+      "sha384": "9a5dd4906b48e87aa6ea61ed58e35e0920c6bd9f9a46679b90057a28d4383d5ef43d0a08e89389d02b2055c5743ef93f"
+    },
+    {
+      "file": "0004_arr_sync.sql",
+      "version": 4,
+      "sha384": "de75604317812d849b6045ee4fb781c58c30b1dea89775e4385c8ffe5e6f3474d6bbd0b81d91bc785070efb2a2cf6a0d"
+    },
+    {
+      "file": "0005_channel_videos.sql",
+      "version": 5,
+      "sha384": "9eb97ae45a724dfc03306fa46f3ebbac221ae0829343e299abb90ca51c80739936b1a48737addd5efe6c371966de3791"
+    },
+    {
+      "file": "0006_unmatched.sql",
+      "version": 6,
+      "sha384": "360acca538eda9f5e33ad02e969f79c2852bdcbd5a4b9bb1ea5d981549f590bb6c4db45947d054bc5419b8d4c838a9eb"
+    },
+    {
+      "file": "0007_video_height.sql",
+      "version": 7,
+      "sha384": "89c3aea86a230a02ee623257d5b79ddf41be0dcfb5eb10b4a64e9aae450462cbb7d8af643ed682ce7ba6bec8b3f28f84"
+    },
+    {
+      "file": "0008_mapping_match_options.sql",
+      "version": 8,
+      "sha384": "916690d78f5477809d9641ddc8216032c026263897a30aa58c9b95147428dca5f8e9d9bb43a98ebdc026f3c0fce17909"
+    },
+    {
+      "file": "0009_aliases.sql",
+      "version": 9,
+      "sha384": "83efe11364bd964a5897919977e3c5abeadf9c201acf42146c3294b02bca7a75274f5f1a1ea3e1a20d29def8c8180336"
+    },
+    {
+      "file": "0010_multipart_releases.sql",
+      "version": 10,
+      "sha384": "2f210816a245e2a4299f0db7f303084b2fdb478fba1b1eea435edcb5836cf4715ca9028be0aa181d21051da0498df1f9"
+    },
+    {
+      "file": "0011_drafts.sql",
+      "version": 11,
+      "sha384": "d2f433be2759a293c92ec207fde278ddc24d63555bc46b34c63d89ae1f5bdace43bacb90a1d38f76303b8736f73630fd"
+    },
+    {
+      "file": "0012_unmatched_ignored.sql",
+      "version": 12,
+      "sha384": "8983e5bceb2865dcc779b36b4106aa309a259008c3fcf28bf5b786be9efbc49c05632e5da32c9b359b13c3040cb7b7d4"
+    },
+    {
+      "file": "0013_playlists.sql",
+      "version": 13,
+      "sha384": "13ca2bb4d1a70db0a5dc6767381801d100b03dac26b17f13179e651d73b2a3fb5ac88d7b642158edc73a01c3ee27f715"
+    },
+    {
+      "file": "0014_language_source.sql",
+      "version": 14,
+      "sha384": "630bc195a1f66b64af8b2863ec87447ef4610ce75ae020cb0668821015cd89fb3b55aba6173a9ce1223107c6b0847787"
+    },
+    {
+      "file": "0015_auth.sql",
+      "version": 15,
+      "sha384": "e520898e3f2b348077be0d3ed7a337ca96bc5e38a32249f487e01945a127247dc93448fad5b92b9f26a9ae26c91bc49b"
+    },
+    {
+      "file": "0016_alias_source.sql",
+      "version": 16,
+      "sha384": "f0291c0b4a8f810b78d5943d4b9673f1dc8037e016f29768dc0ed007f4ce5ad0d63cbdbe5a184411894e5cad649e4ce8"
+    },
+    {
+      "file": "0017_root_folders.sql",
+      "version": 17,
+      "sha384": "1297fb845f4e2f50fc9ad952e21ca6c9f73a21217c117b10e7bfa7704edc89cc210062ce28c28c94a35157ffd2e7a04e"
+    },
+    {
+      "file": "0018_playlist_mode.sql",
+      "version": 18,
+      "sha384": "7e8a10cdf1d5ca0c4e2faaf3d5685e549e140d1caa02c2d8c02d8068ae7cbb6b951b18a00c06db29ae320f60ee8e4c0b"
+    },
+    {
+      "file": "0019_backfill.sql",
+      "version": 19,
+      "sha384": "1f946f217b41c7d74cedab42172cd15752a23e92cf127b87ea67957745b21de085a1586a37cdb6b7b45f99aa923942a7"
+    },
+    {
+      "file": "0020_backfill_retry.sql",
+      "version": 20,
+      "sha384": "841212bab10e664d4e7552575c1ed53c2c5b8ce410e0df39fe96e741aa962e55315a18bd0d54c370bd9bb6b03b8b99c1"
+    },
+    {
+      "file": "0021_unplayable.sql",
+      "version": 21,
+      "sha384": "2a4dce2e62ea8e48736703a18ab5053487e2e8b6e71e5422296ba108e6ae8e71e146432be76a477c37db439260c2ddbf"
+    },
+    {
+      "file": "0022_quality_height.sql",
+      "version": 22,
+      "sha384": "b5975de7dcea34f5287c1e105fbc9018379272e1ebb1b061cbfe7340de80a905dffa86a828cb1792a2fc1d0540ee3ebb"
+    },
+    {
+      "file": "0023_unmatched_video.sql",
+      "version": 23,
+      "sha384": "ece905f7a448f4452dfc73616de43d48195ffd1e560e9f6fd3fbacd77d44dde05abff034c7827b158101a5dbf38a60d4"
+    },
+    {
+      "file": "0024_unplayable_retry.sql",
+      "version": 24,
+      "sha384": "4ca6281058c1989713d6ba43839434efeb2966c07ddaf9bbb2f0b01d344925406d75adf273bdaae8de9cdb2d6eb382eb"
+    },
+    {
+      "file": "0025_backfill_limit.sql",
+      "version": 25,
+      "sha384": "d7c8b3e3a85117a5e471dbdb1c1af86732bfac38d7c443181852d32b7807bbda734cecb5b837822a791bb9e9440fda3d"
+    },
+    {
+      "file": "0026_title_number.sql",
+      "version": 26,
+      "sha384": "3e7502b9783297c377a9c0a5bd0970c53113361c6661b55c59ed0b3fe7bf2b073ef93055f1e03b24e755ab6043f30065"
+    },
+    {
+      "file": "0027_channel_video_skip.sql",
+      "version": 27,
+      "sha384": "bc1a05c97398f545bc5b6228b661290211730695c76ff8c74474580a8e99f3cea31c9afe07360e44b844db4430626951"
+    },
+    {
+      "file": "0028_members_only_retry.sql",
+      "version": 28,
+      "sha384": "954e47247981b846b45fae3a415d42b1e93d43a4483c2f770ef1f0c1b552fa68dfd7e8cee1f3240eb6dc65a08753adb6"
+    },
+    {
+      "file": "0029_audio_version.sql",
+      "version": 29,
+      "sha384": "ff2749a33c0d3d08fda33c3bac2631b293d36e138d9290204cf15592165b689246c27ebd6432674d9c98c8c8c7e9ea6f"
+    },
+    {
+      "file": "0030_mapping_timezone.sql",
+      "version": 30,
+      "sha384": "a6a5d53caf0d395f36bceb5732b01522064b931ed60b4c52a2ae32e7a005008b98e534d29942617e5058894172f30725"
+    },
+    {
+      "file": "0031_prebuild_queue.sql",
+      "version": 31,
+      "sha384": "271e32c96a11197fe33b739ba317f74b572974b7721823bad31deb4c8472b79e0f1c6603f008c7d7b25fbcd9a303849d"
+    },
+    {
+      "file": "0032_video_uploaded_at.sql",
+      "version": 32,
+      "sha384": "8778f8dc6177d655a925573a18fe9e92b546212032d9f08fd4634cf0c9e34315d5a6e4d0869f7b69551af5845649d24d"
+    },
+    {
+      "file": "0033_jellyfin_merge_queue.sql",
+      "version": 33,
+      "sha384": "22a57f750f838e9bedd3347296dc9825d5ee877ca6178d2e16ab36e7e433deb31ef6a22bbd3498c3ad247fbb7b6f27b1"
+    },
+    {
+      "file": "0034_episode_thumbnails.sql",
+      "version": 34,
+      "sha384": "c7275cbd0750229a9397623d5099c14be0de951fa6fef58813c4b53859275756b0f370ddf73c6b820f769415487c2016"
+    },
+    {
+      "file": "0035_released_videos.sql",
+      "version": 35,
+      "sha384": "433b7cdd73f652155b7cab0b13d2ecc19374e2dfd1db6a435d1de4f0205299bb1546965093804aecdd7e3484a79b790a"
+    },
+    {
+      "file": "0036_match_inputs.sql",
+      "version": 36,
+      "sha384": "c8907cf938a5fa86e95c176ffe52c443cfe5f6ea73bb558c021eaf02a6b42f2872054403ea7e19a41e3c414ece88f42b"
+    },
+    {
+      "file": "0037_channel_titles.sql",
+      "version": 37,
+      "sha384": "3949036f94f0f5224db810af55b7184b92c267271ffabd64e98cb882766c8a0c8a47920d96a157881c4521b043f1b177"
+    },
+    {
+      "file": "0038_arr_connections.sql",
+      "version": 38,
+      "sha384": "43c047d7d2dbbee257e08a0e008646741bf18073b3eb0a888cc6343639b43dc29329bf46fb070ef4af9e319765477c2d"
+    },
+    {
+      "file": "0040_activity_events.sql",
+      "version": 40,
+      "sha384": "9ddab9122116ae180c5913e0d0d3d86d31fe76577d6584430684766669572a1e3621d386c8c866427345dfb13f5de3e6"
+    }
+  ]
+}

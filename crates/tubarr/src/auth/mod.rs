@@ -92,8 +92,8 @@ impl Auth {
         forwarded_client(&self.config.trusted_proxies, peer, headers)
     }
 
-    /// The address the throttles count: the client, or the TCP peer when a trusted proxy sent an
-    /// `X-Forwarded-For` that does not parse.
+    /// The address the throttles count: the client, or the TCP peer when a trusted proxy does not
+    /// establish a client through `X-Forwarded-For`.
     fn throttle_ip(&self, extensions: &Extensions, headers: &HeaderMap) -> Option<IpAddr> {
         self.client_ip(extensions, headers)
             .or_else(|| peer_ip(extensions))
@@ -327,9 +327,9 @@ fn in_any(nets: &[IpNet], ip: IpAddr) -> bool {
 }
 
 /// The client address: the TCP peer, or, when the peer is in `trusted`, the right-most
-/// `X-Forwarded-For` entry that is not itself trusted. A trusted peer that sends no
-/// `X-Forwarded-For` is judged as itself. An entry that does not parse gives `None`, since nothing
-/// to its left can be believed.
+/// `X-Forwarded-For` entry that is not itself trusted. A trusted peer with no header or only
+/// trusted hops gives `None`. An encountered entry that does not parse also gives `None`, since
+/// nothing to its left can be believed.
 pub fn forwarded_client(trusted: &[IpNet], peer: IpAddr, headers: &HeaderMap) -> Option<IpAddr> {
     if !in_any(trusted, peer) {
         return Some(peer);
@@ -343,14 +343,13 @@ pub fn forwarded_client(trusted: &[IpNet], peer: IpAddr, headers: &HeaderMap) ->
         .flat_map(|v| v.split(','))
         .map(str::trim)
         .collect();
-    let mut client = peer;
     while let Some(hop) = hops.pop() {
-        client = hop.parse::<IpAddr>().ok()?.to_canonical();
+        let client = hop.parse::<IpAddr>().ok()?.to_canonical();
         if !in_any(trusted, client) {
-            break;
+            return Some(client);
         }
     }
-    Some(client)
+    None
 }
 
 /// Middleware for `/play`: refuses clients outside `auth.play_allowed_networks`.
@@ -427,13 +426,82 @@ mod tests {
             proxied.client_ip(ip("10.0.0.2"), &lan),
             Some(ip("10.1.2.3"))
         );
-        assert_eq!(
-            proxied.client_ip(ip("10.0.0.2"), &HeaderMap::new()),
-            Some(ip("10.0.0.2"))
-        );
+        assert_eq!(proxied.client_ip(ip("10.0.0.2"), &HeaderMap::new()), None);
         assert_eq!(
             proxied.client_ip(ip("10.0.0.2"), &forwarded(&["nope"])),
             None
+        );
+    }
+
+    #[test]
+    fn trusted_proxy_requires_an_untrusted_client() {
+        let proxied = access(&["10.0.0.2/32", "10.0.0.3/32"]);
+        let peer = "10.0.0.2".parse().unwrap();
+        for values in [
+            vec![],
+            vec!["10.0.0.3"],
+            vec!["10.0.0.2, 10.0.0.3"],
+            vec!["10.0.0.2", "::ffff:10.0.0.3"],
+        ] {
+            assert_eq!(
+                proxied.client_ip(peer, &forwarded(&values)),
+                None,
+                "{values:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn encountered_invalid_forwarded_hops_fail_closed() {
+        let proxied = access(&["10.0.0.2/32", "10.0.0.3/32"]);
+        let peer = "10.0.0.2".parse().unwrap();
+        for values in [
+            vec![""],
+            vec![" "],
+            vec!["nope"],
+            vec!["10.1.2.3,"],
+            vec!["10.1.2.3, , 10.0.0.3"],
+            vec!["10.1.2.3", "nope, 10.0.0.3"],
+            vec!["10.1.2.3", ""],
+        ] {
+            assert_eq!(
+                proxied.client_ip(peer, &forwarded(&values)),
+                None,
+                "{values:?}"
+            );
+        }
+        let mut non_text = forwarded(&["10.1.2.3"]);
+        non_text.append(
+            FORWARDED_FOR,
+            axum::http::HeaderValue::from_bytes(&[0xff]).unwrap(),
+        );
+        assert_eq!(proxied.client_ip(peer, &non_text), None);
+    }
+
+    #[tokio::test]
+    async fn unidentified_proxy_throttles_still_count_the_tcp_peer() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = crate::config::Config::from_toml(&format!(
+            "public_url = \"http://localhost:8480\"\ndata_dir = {:?}\n[auth]\ntrusted_proxies = [\"10.0.0.2/32\", \"10.0.0.3/32\"]\n",
+            dir.path()
+        ))
+        .unwrap();
+        let db = Db::open(&config.database_path()).await.unwrap();
+        let auth = Auth::new(config.auth, db).unwrap();
+        let mut ext = Extensions::new();
+        ext.insert(ConnectInfo(
+            "[::ffff:10.0.0.2]:4000".parse::<SocketAddr>().unwrap(),
+        ));
+        for values in [vec![], vec![""], vec!["nope"], vec!["10.0.0.3"]] {
+            assert_eq!(
+                auth.throttle_ip(&ext, &forwarded(&values)),
+                Some("10.0.0.2".parse().unwrap()),
+                "{values:?}"
+            );
+        }
+        assert_eq!(
+            auth.throttle_ip(&ext, &forwarded(&["203.0.113.7, 10.0.0.3"])),
+            Some("203.0.113.7".parse().unwrap())
         );
     }
 }

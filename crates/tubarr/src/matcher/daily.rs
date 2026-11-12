@@ -155,6 +155,7 @@ pub(super) async fn match_one(
         by_date,
         unmonitored,
         unplaced,
+        ..
     } = place(uploads, &listed, &pinned, floor);
     report.not_wanted += unplaced;
     notes.extend(
@@ -376,6 +377,8 @@ pub(super) struct Placed<'a> {
     pub unmonitored: Vec<(String, Upload<'a>)>,
     /// Uploads that fit no listed date.
     pub unplaced: u64,
+    /// The rejected uploads, retaining their resolved durations for numbered podcasts.
+    pub unplaced_uploads: Vec<Upload<'a>>,
 }
 
 /// Puts each upload on an air date Sonarr monitors, and counts the ones that fit none.
@@ -395,7 +398,7 @@ pub(super) fn place<'a>(
     let mut by_date: BTreeMap<String, Vec<Upload<'a>>> = BTreeMap::new();
     let mut unmonitored: Vec<(String, Upload<'a>)> = Vec::new();
     let mut drifting: Vec<Dated<'a>> = Vec::new();
-    let mut unplaced = 0;
+    let mut unplaced_uploads = Vec::new();
     for d in dated {
         let own = iso(d.date);
         if listed.wanted.contains(own.as_str()) {
@@ -405,7 +408,7 @@ pub(super) fn place<'a>(
         } else if d.from_upload && is_long(&d.upload, floor) {
             drifting.push(d);
         } else {
-            unplaced += 1;
+            unplaced_uploads.push(d.upload);
         }
     }
     let claimed: HashSet<String> = by_date
@@ -422,13 +425,14 @@ pub(super) fn place<'a>(
             .find(|n| listed.wanted.contains(n.as_str()) && !claimed.contains(n));
         match near {
             Some(date) => by_date.entry(date).or_default().push(d.upload),
-            None => unplaced += 1,
+            None => unplaced_uploads.push(d.upload),
         }
     }
     Placed {
         by_date,
         unmonitored,
-        unplaced,
+        unplaced: unplaced_uploads.len() as u64,
+        unplaced_uploads,
     }
 }
 

@@ -18,6 +18,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 from xml.sax.saxutils import escape
 
+from evidence import redact_text, run_secrets
+
 
 def catalog():
     with open(os.environ["TUBARR_E2E_CATALOG"], encoding="utf-8") as f:
@@ -61,7 +63,10 @@ class Handler(BaseHTTPRequestHandler):
     media_dir = "."
 
     def log_message(self, fmt, *args):
-        sys.stderr.write("fake-youtube " + (fmt % args) + " range=" + str(self.headers.get("Range")) + "\n")
+        work = os.environ.get("E2E_WORK")
+        secrets = run_secrets(work) if work else ()
+        text = "fake-youtube " + (fmt % args) + " range=" + str(self.headers.get("Range")) + "\n"
+        sys.stderr.write(redact_text(text, secrets))
 
     def send(self, code, body, ctype, extra=None):
         self.send_response(code)

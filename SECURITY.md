@@ -23,3 +23,11 @@ Out of scope: problems in yt-dlp, deno, Sonarr, Radarr, Jellyfin or YouTube itse
 ## Supported versions
 
 Tubarr is pre-alpha. Only the latest release and the `main` branch get security fixes.
+
+## Known accepted dependency risk
+
+Tubarr 0.1.1 uses SQLx 0.9.0 with libsqlite3-sys 0.37.0 and bundled SQLite 3.51.3, which remains affected by [RUSTSEC-2026-0459](https://rustsec.org/advisories/RUSTSEC-2026-0459). Opening a crafted database together with a sibling WAL file whose page size differs can expose process memory through query results.
+
+This is an accepted risk, not a patched or unaffected library. Keep database and WAL files, their storage and backups trusted. Never restore untrusted database files. Normal mapping JSON imports contain metadata, not raw database uploads.
+
+The audit exception is limited to this advisory. A compatible official SQLx release that permits a fixed bundled SQLite dependency will allow the exception to be removed.

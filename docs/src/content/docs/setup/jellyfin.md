@@ -75,7 +75,11 @@ trusted_proxies = ["172.18.0.10/32"]
 
 Only list proxies you run. Tubarr believes their `X-Forwarded-For` header and nobody else's.
 
-Tubarr judges `/play` by the right-most `X-Forwarded-For` address that is not a trusted proxy, so a client cannot get in by adding a fake address of its own. `X-Forwarded-For` from any other peer is ignored, and a trusted proxy that sends none is judged by its own address. The same client address decides `local_bypass` and the sign-in and setup code throttles. Rootless Docker and Podman can show every client as a private address, so there, set `play_allowed_networks` to the exact range Jellyfin fetches from.
+Tubarr judges `/play` by the right-most `X-Forwarded-For` address that is not a trusted proxy, so a client cannot get in by adding a fake address of its own. A trusted proxy must establish that client. A missing header, an unusable chain or a chain containing only trusted addresses gets a 403, even when the proxy itself has a private address. `X-Forwarded-For` from any other peer is ignored.
+
+Direct private Jellyfin connections outside `trusted_proxies` need no `X-Forwarded-For`. If a broad proxy CIDR also includes Jellyfin's direct address, narrow the proxy list or configure proper forwarding. There is no direct-client exception for an address listed as a proxy.
+
+The same resolved client address decides `local_bypass` and the sign-in and setup code throttles. When a trusted proxy establishes no client, local bypass is refused, while throttles still count the actual TCP peer. That throttle fallback grants no play permission. Rootless Docker and Podman can show every client as a private address, so there, set `play_allowed_networks` to the exact range Jellyfin fetches from.
 
 Do not forward port 8480 on your router or expose it on a public address. If Jellyfin runs elsewhere, connect the two over a VPN (WireGuard, Tailscale, NetBird) and add that range to `play_allowed_networks`. `listen` stays `0.0.0.0:8480` by default, since inside a container Tubarr must listen on all interfaces to be reachable at all. The network rule is what keeps strangers out.
 

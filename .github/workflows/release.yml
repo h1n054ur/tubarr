@@ -30,6 +30,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  e2e:
+    name: Real E2E
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Docker availability
+        run: docker info
+      - name: Harness runtime prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ffmpeg python3
+      - name: Install Rust (version from rust-toolchain.toml)
+        run: rustup toolchain install
+      - name: Build source binary
+        run: cargo build --release --locked
+      - name: Real Sonarr and Radarr end-to-end check
+        run: e2e/run.sh "$RUNNER_TEMP/tubarr-e2e-sanitized"
+      - name: Sanitized failure evidence
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: e2e-failure-evidence
+          path: ${{ runner.temp }}/tubarr-e2e-sanitized
+          retention-days: 3
+          if-no-files-found: warn
+
   notes:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -38,6 +74,9 @@ jobs:
       prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Version
         id: version
         run: |
@@ -78,7 +117,7 @@ jobs:
           if-no-files-found: error
 
   build:
-    needs: notes
+    needs: [notes, checks, e2e]
     strategy:
       fail-fast: true
       matrix:
@@ -94,6 +133,9 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Image name
         # GHCR wants the name in lower case.
         run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/tubarr" >> "$GITHUB_ENV"

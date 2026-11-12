@@ -174,6 +174,16 @@ fn on_episode(mut note: NewUnmatched, (season, episode): (i64, i64)) -> NewUnmat
     note
 }
 
+fn missing_target_note(cand: &Candidate, number: u64) -> NewUnmatched {
+    daily::unsure(
+        cand,
+        format!(
+            "no TVDB title names #{number} yet and no free listed air date fits this upload, \
+             wait for TVDB/Sonarr metadata or pin it to its episode"
+        ),
+    )
+}
+
 pub(super) async fn match_one(
     db: &Db,
     series: &WantedSeries,
@@ -239,6 +249,7 @@ pub(super) async fn match_one(
     // Each number's uploads, with the one wanted episode it names.
     let mut by_slot: BTreeMap<u64, ((i64, i64), Vec<Upload<'_>>)> = BTreeMap::new();
     let mut dated = Vec::new();
+    let mut dated_numbers = BTreeMap::new();
     for cand in &on_channels {
         if pinned_videos.contains(cand.video_id.as_str()) {
             continue;
@@ -309,12 +320,25 @@ pub(super) async fn match_one(
             // An older episode Sonarr does not want, or one TVDB names without its number.
             None if highest.is_some_and(|h| n <= h) => report.not_wanted += 1,
             None => match daily::date_upload(cand, &zone, &listed, metadata).await? {
-                Dating::Dated(d) => dated.push(d),
+                Dating::Dated(d) => {
+                    dated_numbers.insert(cand.video_id.as_str(), n);
+                    dated.push(d);
+                }
                 Dating::Unsure(reason) => notes.push(daily::unsure(
                     cand,
                     format!("no TVDB title names #{n} yet and {reason}"),
                 )),
-                Dating::Unlisted => report.not_wanted += 1,
+                Dating::Unlisted => {
+                    let duration = match cand.duration_secs {
+                        Some(d) => Some(d),
+                        None => metadata.known(&cand.video_id).await?.duration_secs,
+                    };
+                    if duration.is_none_or(|d| d >= floor) {
+                        notes.push(missing_target_note(cand, n));
+                    } else {
+                        report.not_wanted += 1;
+                    }
+                }
             },
         }
     }
@@ -340,9 +364,17 @@ pub(super) async fn match_one(
     let daily::Placed {
         by_date,
         unmonitored,
-        unplaced,
+        unplaced_uploads,
+        ..
     } = daily::place(dated, &listed, &pinned_dates, floor);
-    report.not_wanted += unplaced;
+    for upload in unplaced_uploads {
+        if upload.duration.is_none_or(|d| d >= floor) {
+            let number = dated_numbers[upload.cand.video_id.as_str()];
+            notes.push(missing_target_note(upload.cand, number));
+        } else {
+            report.not_wanted += 1;
+        }
+    }
     notes.extend(
         unmonitored
             .iter()

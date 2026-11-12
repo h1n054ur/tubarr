@@ -8,7 +8,7 @@ all-features = true
 
 [advisories]
 # Any RustSec advisory (vulnerability, unsound, unmaintained or yanked) fails the check. An
-# advisory that does not affect Tubarr goes in `ignore` with its id and the reason.
+# exception goes in `ignore` with its id and an applicability or accepted-risk reason.
 version = 2
 yanked = "deny"
 ignore = [
@@ -18,6 +18,9 @@ ignore = [
     # release on the line openidconnect uses. Drop these once it moves on.
     { id = "RUSTSEC-2023-0071", reason = "rsa: public key verification only, no private key in Tubarr" },
     { id = "RUSTSEC-2026-0387", reason = "crypto-bigint 0.5: public key verification only, no secret integers" },
+    # Crafted database and sibling WAL files can expose process memory. Normal mapping JSON
+    # imports are metadata, not raw database uploads. See SECURITY.md for the accepted risk.
+    { id = "RUSTSEC-2026-0459", reason = "SQLite: accepted risk with trusted database and WAL files pending a compatible official SQLx fix" },
 ]
 
 [licenses]

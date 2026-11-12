@@ -2,10 +2,12 @@
 //! `[play] max_builds` and `max_streams` hold. The fake googlevideo can hold back every request for
 //! a video until the test lets it go, so the tests wait on what the server saw, never on time.
 
+#[path = "support/ranges.rs"]
+mod ranges;
 mod support;
 
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     net::SocketAddr,
     sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -18,6 +20,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
+use ranges::{Fault, Overflow};
 use tokio::sync::watch;
 use tubarr::{
     play::{PlayConfig, PlayLoad, PlayState, router},
@@ -40,6 +43,7 @@ struct Upstream {
     arrived: watch::Sender<usize>,
     /// Videos whose requests wait until they leave the set.
     held: watch::Sender<HashSet<String>>,
+    overflow: Mutex<HashMap<String, Arc<Overflow>>>,
 }
 
 impl Upstream {
@@ -102,6 +106,12 @@ async fn upstream_file(
     let end = b
         .parse::<usize>()
         .map_or(data.len() - 1, |e| e.min(data.len() - 1));
+    if start != 0
+        && kind == "v.mp4"
+        && let Some(producer) = up.overflow.lock().unwrap().get(id).cloned()
+    {
+        return Fault::Overflow(producer).response(data, start, end);
+    }
     (
         StatusCode::PARTIAL_CONTENT,
         [(
@@ -328,4 +338,80 @@ async fn streams_past_max_streams_answer_503_with_retry_after() {
     assert!(!body.is_empty());
     h.load_until(|l| l.streams == 0).await;
     assert_eq!(h.get(ID2).await.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn concurrent_oversized_ranges_fail_without_cache_entries() {
+    let h = Harness::new(2, 8).await;
+    let mut before_media = Vec::new();
+    for id in [ID1, ID2] {
+        assert_eq!(finished(h.head(id)).await, StatusCode::OK);
+        before_media.push((id, h.upstream.seen(id).len()));
+        h.upstream.hold(id);
+    }
+    let producers: Vec<_> = [ID1, ID2]
+        .into_iter()
+        .map(|id| {
+            let producer = Arc::new(Overflow::default());
+            h.upstream
+                .overflow
+                .lock()
+                .unwrap()
+                .insert(id.to_owned(), producer.clone());
+            producer
+        })
+        .collect();
+    let mut plays = Vec::new();
+    for id in [ID1, ID2] {
+        let response = h.get(id).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        plays.push(tokio::spawn(async move { response.bytes().await }));
+    }
+    for (id, before) in before_media {
+        // The request is recorded before the hold is released.
+        let mut arrived = h.upstream.arrived.subscribe();
+        tokio::time::timeout(
+            STUCK,
+            arrived.wait_for(|_| h.upstream.seen(id).len() > before),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    }
+    h.upstream.release(ID1);
+    h.upstream.release(ID2);
+    let stopped = futures_util::future::join_all(
+        producers
+            .iter()
+            .map(|producer| producer.stopped_before_eof(1)),
+    )
+    .await;
+    for producer in &producers {
+        producer.release();
+    }
+    for play in plays {
+        assert!(
+            tokio::time::timeout(STUCK, play)
+                .await
+                .unwrap()
+                .unwrap()
+                .is_err()
+        );
+    }
+    h.upstream.overflow.lock().unwrap().clear();
+    h.load_until(|load| load.streams == 0).await;
+    for id in [ID1, ID2] {
+        let before = h.upstream.seen(&format!("{id}-v.mp4")).len();
+        let response = h.get(id).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(!response.bytes().await.unwrap().is_empty());
+        assert!(h.upstream.seen(&format!("{id}-v.mp4")).len() > before);
+        let cached = h.upstream.seen(&format!("{id}-v.mp4")).len();
+        h.get(id).await.bytes().await.unwrap();
+        assert_eq!(h.upstream.seen(&format!("{id}-v.mp4")).len(), cached);
+    }
+    assert!(
+        stopped.iter().all(|stopped| *stopped),
+        "concurrent readers waited for the overflow producer's EOF"
+    );
 }

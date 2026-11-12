@@ -1,7 +1,7 @@
 //! The binary manager against a fake GitHub: release JSON with ETags, assets and checksum files, all local.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::Write as _,
     os::unix::fs::PermissionsExt,
     path::Path,
@@ -12,6 +12,7 @@ mod support;
 
 use axum::{
     Router,
+    body::Body,
     extract::{Path as UrlPath, State},
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
@@ -33,6 +34,9 @@ struct Fake {
     releases: HashMap<String, (serde_json::Value, String)>,
     /// path under /dl -> body, None answers 500
     files: HashMap<String, Option<Vec<u8>>>,
+    /// Body framing overrides for hostile release responses.
+    chunked_files: HashSet<String>,
+    declared_lengths: HashMap<String, u64>,
     api_calls: usize,
     not_modified: usize,
     downloads: usize,
@@ -77,7 +81,33 @@ async fn download(State(fake): State<Shared>, UrlPath(path): UrlPath<String>) ->
     let mut fake = fake.lock().unwrap();
     fake.downloads += 1;
     match fake.files.get(&path) {
-        Some(Some(body)) => body.clone().into_response(),
+        Some(Some(body)) => {
+            let mut response = if fake.chunked_files.contains(&path)
+                || fake.declared_lengths.contains_key(&path)
+            {
+                let body = bytes::Bytes::from(body.clone());
+                let first =
+                    futures_util::stream::once(
+                        async move { Ok::<_, std::convert::Infallible>(body) },
+                    );
+                if fake.declared_lengths.contains_key(&path) {
+                    use futures_util::StreamExt as _;
+                    // Keep the connection open so the advertised length reaches
+                    // the client, without a giant payload or premature EOF.
+                    Body::from_stream(first.chain(futures_util::stream::pending())).into_response()
+                } else {
+                    Body::from_stream(first).into_response()
+                }
+            } else {
+                body.clone().into_response()
+            };
+            if let Some(length) = fake.declared_lengths.get(&path) {
+                response
+                    .headers_mut()
+                    .insert(header::CONTENT_LENGTH, length.to_string().parse().unwrap());
+            }
+            response
+        }
         Some(None) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
     }
@@ -386,6 +416,146 @@ async fn broken_new_binary_is_rolled_back() {
         Err(BinaryError::Smoke { .. })
     ));
     assert_eq!(bins.version(Tool::YtDlp).await.unwrap(), "2026.08.19");
+}
+
+#[tokio::test]
+async fn oversized_checksum_body_preserves_live_and_previous_and_cleans_staging() {
+    for tool in Tool::ALL {
+        for chunked in [false, true] {
+            let fake = start().await;
+            publish_yt_dlp(&fake, "2026.08.19");
+            publish_deno(&fake, "2.9.7");
+            let dir = tempfile::tempdir().unwrap();
+            let bins = manager(&fake, dir.path());
+            bins.ensure().await.unwrap();
+            let target = bins.path(tool);
+            let live = std::fs::read(&target).unwrap();
+            let previous = dir.path().join(format!("{}.prev", tool.name()));
+            std::fs::write(&previous, b"previous rollback sentinel").unwrap();
+            let sums_path = match tool {
+                Tool::YtDlp => {
+                    publish_yt_dlp(&fake, "2026.10.10");
+                    "2026.10.10/SHA2-256SUMS"
+                }
+                Tool::Deno => {
+                    publish_deno(&fake, "2.9.8");
+                    "v2.9.8/deno-x86_64-unknown-linux-gnu.zip.sha256sum"
+                }
+            };
+            {
+                let mut f = fake.lock().unwrap();
+                // Keep the correct checksum at the start. An unbounded reader would
+                // accept it and install the update, so this is a behavioral red.
+                let sums = f.files.get_mut(sums_path).unwrap().as_mut().unwrap();
+                sums.resize(4097, b' ');
+                if chunked {
+                    f.chunked_files.insert(sums_path.to_owned());
+                }
+            }
+            let downloads = fake.lock().unwrap().downloads;
+            let results = bins.check(true).await;
+            assert_eq!(
+                std::fs::read(&target).unwrap(),
+                live,
+                "{tool:?}, chunked={chunked}"
+            );
+            assert_eq!(
+                std::fs::read(&previous).unwrap(),
+                b"previous rollback sentinel"
+            );
+            assert_clean(dir.path());
+            assert_eq!(
+                fake.lock().unwrap().downloads,
+                downloads + 1,
+                "must not request the binary after rejecting its checksum body"
+            );
+            let err = outcome(&results, tool).as_ref().unwrap_err();
+            assert!(
+                matches!(err, BinaryError::Io(e) if e.kind() == std::io::ErrorKind::InvalidData),
+                "{err:?}"
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn exact_checksum_text_cap_is_allowed() {
+    for tool in Tool::ALL {
+        let fake = start().await;
+        publish_yt_dlp(&fake, "2026.08.19");
+        publish_deno(&fake, "2.9.7");
+        let path = match tool {
+            Tool::YtDlp => "2026.08.19/SHA2-256SUMS",
+            Tool::Deno => "v2.9.7/deno-x86_64-unknown-linux-gnu.zip.sha256sum",
+        };
+        {
+            let mut f = fake.lock().unwrap();
+            f.files
+                .get_mut(path)
+                .unwrap()
+                .as_mut()
+                .unwrap()
+                .resize(4096, b' ');
+            f.chunked_files.insert(path.to_owned());
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let bins = manager(&fake, dir.path());
+        bins.ensure().await.unwrap();
+        assert!(bins.version(tool).await.is_ok());
+        assert_clean(dir.path());
+    }
+}
+
+#[tokio::test]
+async fn oversized_download_metadata_preserves_live_and_previous_and_cleans_staging() {
+    for tool in Tool::ALL {
+        let fake = start().await;
+        publish_yt_dlp(&fake, "2026.08.19");
+        publish_deno(&fake, "2.9.7");
+        let dir = tempfile::tempdir().unwrap();
+        let bins = manager(&fake, dir.path());
+        bins.ensure().await.unwrap();
+        let target = bins.path(tool);
+        let live = std::fs::read(&target).unwrap();
+        let previous = dir.path().join(format!("{}.prev", tool.name()));
+        std::fs::write(&previous, b"older sentinel").unwrap();
+        let path = match tool {
+            Tool::YtDlp => {
+                publish_yt_dlp(&fake, "2026.10.10");
+                "2026.10.10/yt-dlp_linux"
+            }
+            Tool::Deno => {
+                publish_deno(&fake, "2.9.8");
+                "v2.9.8/deno-x86_64-unknown-linux-gnu.zip"
+            }
+        };
+        fake.lock()
+            .unwrap()
+            .declared_lengths
+            .insert(path.to_owned(), 134_217_729);
+        let url = format!("{}/dl/{path}", fake.lock().unwrap().base);
+        let probe = reqwest::Client::builder()
+            .no_proxy()
+            .build()
+            .unwrap()
+            .get(&url)
+            .send()
+            .await
+            .expect("hostile fixture must send its headers before failing the body");
+        assert_eq!(probe.content_length(), Some(134_217_729));
+        drop(probe);
+        let results = tokio::time::timeout(std::time::Duration::from_secs(2), bins.check(true))
+            .await
+            .expect("declared oversize must be rejected before body EOF");
+        assert_eq!(std::fs::read(&target).unwrap(), live);
+        assert_eq!(std::fs::read(&previous).unwrap(), b"older sentinel");
+        assert_clean(dir.path());
+        let err = outcome(&results, tool).as_ref().unwrap_err();
+        assert!(
+            matches!(err, BinaryError::Io(e) if e.kind() == std::io::ErrorKind::InvalidData),
+            "{err:?}"
+        );
+    }
 }
 
 #[tokio::test]

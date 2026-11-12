@@ -180,6 +180,70 @@ enum FetchError {
     Other(String),
 }
 
+/// The returned span and optional file size of one satisfied upstream byte range.
+fn response_range(
+    headers: &HeaderMap,
+    start: u64,
+    end: u64,
+) -> Result<(u64, Option<u64>), FetchError> {
+    let invalid = || FetchError::Other("invalid upstream Content-Range".into());
+    let decimal = |value: &str| -> Option<u64> {
+        if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        value.parse().ok()
+    };
+    let requested = end
+        .checked_sub(start)
+        .and_then(|n| n.checked_add(1))
+        .ok_or_else(invalid)?;
+    let mut values = headers.get_all(header::CONTENT_RANGE).iter();
+    let value = values.next().ok_or_else(invalid)?;
+    if values.next().is_some() {
+        return Err(invalid());
+    }
+    let value = value
+        .to_str()
+        .map_err(|_| invalid())?
+        .trim_matches([' ', '\t']);
+    let (unit, range) = value.split_once(' ').ok_or_else(invalid)?;
+    if !unit.eq_ignore_ascii_case("bytes") {
+        return Err(invalid());
+    }
+    let (bounds, total) = range.split_once('/').ok_or_else(invalid)?;
+    let (first, last) = bounds.split_once('-').ok_or_else(invalid)?;
+    let first = decimal(first).ok_or_else(invalid)?;
+    let last = decimal(last).ok_or_else(invalid)?;
+    let span = last
+        .checked_sub(first)
+        .and_then(|n| n.checked_add(1))
+        .ok_or_else(invalid)?;
+    if first != start || last > end || span > requested {
+        return Err(invalid());
+    }
+    let total = if total == "*" {
+        None
+    } else {
+        let total = decimal(total).ok_or_else(invalid)?;
+        if total <= last {
+            return Err(invalid());
+        }
+        Some(total)
+    };
+    for length in headers.get_all(header::CONTENT_LENGTH) {
+        let length = length
+            .to_str()
+            .ok()
+            .and_then(|s| decimal(s.trim_matches([' ', '\t'])));
+        if length != Some(span) {
+            return Err(FetchError::Other(
+                "upstream Content-Length disagrees with Content-Range".into(),
+            ));
+        }
+    }
+    Ok((span, total))
+}
+
 /// What googlevideo answers for a signed URL that no longer works: 403 once it has expired or is
 /// used from another IP, 401 and 410 once the video was processed again and the old file is gone.
 fn is_refusal(status: StatusCode) -> bool {
@@ -817,7 +881,7 @@ impl<C: ResolveCache + 'static> PlayState<C> {
                 request = request.header(name, value);
             }
         }
-        let response = request
+        let mut response = request
             .header(header::RANGE, format!("bytes={start}-{end}"))
             .send()
             .await
@@ -832,17 +896,28 @@ impl<C: ResolveCache + 'static> PlayState<C> {
                 )));
             }
         }
-        let size = response
-            .headers()
-            .get(header::CONTENT_RANGE)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.rsplit_once('/'))
-            .and_then(|(_, total)| total.parse().ok());
-        let bytes = response
-            .bytes()
+        let (span, size) = response_range(response.headers(), start, end)?;
+        let invalid_length =
+            || FetchError::Other("upstream body length disagrees with Content-Range".into());
+        let mut bytes = Vec::new();
+        let mut received = 0_u64;
+        while let Some(chunk) = response
+            .chunk()
             .await
-            .map_err(|e| FetchError::Other(e.without_url().to_string()))?;
-        Ok((bytes, size))
+            .map_err(|e| FetchError::Other(e.without_url().to_string()))?
+        {
+            let length = u64::try_from(chunk.len()).map_err(|_| invalid_length())?;
+            let next = received.checked_add(length).ok_or_else(invalid_length)?;
+            if next > span || bytes.len().checked_add(chunk.len()).is_none() {
+                return Err(invalid_length());
+            }
+            bytes.extend_from_slice(&chunk);
+            received = next;
+        }
+        if received != span {
+            return Err(invalid_length());
+        }
+        Ok((Bytes::from(bytes), size))
     }
 
     /// The sample data of one chunk, from the cache or from YouTube.

@@ -29,6 +29,12 @@ const SMOKE_TIMEOUT: Duration = Duration::from_secs(30);
 const LOOP_TICK: Duration = Duration::from_secs(3600);
 const STATE_FILE: &str = "binaries.json";
 
+// Independent limits for downloaded assets, decompressed entries and checksum responses.
+const YT_DLP_DOWNLOAD_LIMIT: u64 = 128 * 1024 * 1024;
+const DENO_DOWNLOAD_LIMIT: u64 = 128 * 1024 * 1024;
+const DENO_EXTRACTED_LIMIT: u64 = 256 * 1024 * 1024;
+const CHECKSUM_TEXT_LIMIT: u64 = 4096;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Tool {
@@ -64,6 +70,8 @@ impl Tool {
                 },
                 sums: "SHA2-256SUMS",
                 zip_entry: None,
+                download_limit: YT_DLP_DOWNLOAD_LIMIT,
+                extracted_limit: 0,
             },
             Tool::Deno => {
                 let (asset, sums) = match arch {
@@ -82,6 +90,8 @@ impl Tool {
                     asset,
                     sums,
                     zip_entry: Some("deno"),
+                    download_limit: DENO_DOWNLOAD_LIMIT,
+                    extracted_limit: DENO_EXTRACTED_LIMIT,
                 }
             }
         })
@@ -105,6 +115,8 @@ struct Spec {
     sums: &'static str,
     /// The file inside the asset when the asset is a zip.
     zip_entry: Option<&'static str>,
+    download_limit: u64,
+    extracted_limit: u64,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -472,7 +484,7 @@ impl BinaryManager {
         let sums_url = release
             .asset_url(spec.sums)
             .ok_or_else(|| missing(spec.sums))?;
-        let sums = install::fetch_text(&self.client, sums_url).await?;
+        let sums = install::fetch_text(&self.client, sums_url, CHECKSUM_TEXT_LIMIT).await?;
         let expected =
             install::expected_sha(&sums, spec.asset).ok_or_else(|| BinaryError::NoChecksum {
                 asset: spec.asset.to_owned(),
@@ -485,7 +497,8 @@ impl BinaryManager {
             .join(format!(".{}.download", spec.asset));
         let staged = self.config.bin_dir.join(format!(".{}.staged", spec.asset));
         let result = async {
-            let actual = install::download(&self.client, asset_url, &download).await?;
+            let actual =
+                install::download(&self.client, asset_url, &download, spec.download_limit).await?;
             if actual != expected {
                 return Err(BinaryError::ChecksumMismatch {
                     asset: spec.asset.to_owned(),
@@ -497,8 +510,9 @@ impl BinaryManager {
                 None => download.clone(),
                 Some(entry) => {
                     let (zip, out) = (download.clone(), staged.clone());
+                    let limit = spec.extracted_limit;
                     tokio::task::spawn_blocking(move || {
-                        install::extract_zip_entry(&zip, entry, &out)
+                        install::extract_zip_entry(&zip, entry, &out, limit)
                     })
                     .await
                     .map_err(std::io::Error::other)??;
@@ -568,6 +582,23 @@ pub(crate) fn now_unix() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn managed_limits_cover_both_architectures_and_channels() {
+        assert_eq!(CHECKSUM_TEXT_LIMIT, 4096);
+        for channel in [Channel::Stable, Channel::Nightly] {
+            for arch in ["x86_64", "aarch64"] {
+                let yt = Tool::YtDlp.spec(channel, arch).unwrap();
+                assert_eq!(yt.download_limit, 134_217_728);
+                assert_eq!(yt.zip_entry, None);
+                let deno = Tool::Deno.spec(channel, arch).unwrap();
+                assert_eq!(deno.repo, "denoland/deno");
+                assert_eq!(deno.download_limit, 134_217_728);
+                assert_eq!(deno.extracted_limit, 268_435_456);
+                assert_eq!(deno.zip_entry, Some("deno"));
+            }
+        }
+    }
 
     #[test]
     fn versions_compare_numerically() {

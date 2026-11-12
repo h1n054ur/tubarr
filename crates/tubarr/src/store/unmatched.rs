@@ -74,7 +74,8 @@ impl Db {
         notes: &[NewUnmatched],
     ) -> Result<u64, StoreError> {
         let now = unix_now();
-        let mut tx = self.pool.begin().await?;
+        // Reserve write intent before retention reads to avoid stale WAL snapshot upgrades.
+        let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let old: HashSet<String> = match self.note_retention_secs {
             Some(retention) => {
                 let ids: Vec<&str> = notes
@@ -98,6 +99,8 @@ impl Db {
             }
             None => HashSet::new(),
         };
+        #[cfg(test)]
+        snapshot_tests::after_retention_read().await;
         let notes: Vec<&NewUnmatched> = notes
             .iter()
             .filter(|n| n.state == UnmatchedState::Pending || !old.contains(&n.video_id))
@@ -229,6 +232,10 @@ impl Db {
         Ok(done.rows_affected() > 0)
     }
 }
+
+#[cfg(test)]
+#[path = "unmatched_snapshot_tests.rs"]
+mod snapshot_tests;
 
 #[cfg(test)]
 mod tests {

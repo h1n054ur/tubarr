@@ -2,6 +2,8 @@
 //! tiny fragmented MP4s made by ffmpeg the way YouTube lays them out (ftyp, moov, sidx, fragments),
 //! joined into one flat MP4.
 
+#[path = "support/ranges.rs"]
+mod ranges;
 mod support;
 
 use std::{
@@ -22,6 +24,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
 };
+use ranges::{Fault, Overflow};
 use support::mp4::*;
 use tubarr::{
     play::{
@@ -46,6 +49,14 @@ struct Upstream {
     refused: Mutex<Option<(String, StatusCode)>>,
     /// A signature whose video file has this many bytes more at its end, as after a re-encode.
     grown: Mutex<Option<(String, usize)>>,
+    fault: Mutex<Option<(RangeTarget, Fault)>>,
+}
+
+#[derive(Clone, Copy)]
+enum RangeTarget {
+    All,
+    Nonzero,
+    Revalidation,
 }
 
 impl Upstream {
@@ -55,6 +66,10 @@ impl Upstream {
 
     fn refuse(&self, sig: &str, status: StatusCode) {
         *self.refused.lock().unwrap() = Some((sig.to_owned(), status));
+    }
+
+    fn fault(&self, target: RangeTarget, fault: Fault) {
+        *self.fault.lock().unwrap() = Some((target, fault));
     }
 }
 
@@ -97,6 +112,16 @@ async fn upstream_file(
     let end = b
         .parse::<usize>()
         .map_or(data.len() - 1, |e| e.min(data.len() - 1));
+    let fault = up.fault.lock().unwrap().clone();
+    if let Some((target, fault)) = fault
+        && match target {
+            RangeTarget::All => true,
+            RangeTarget::Nonzero => start != 0,
+            RangeTarget::Revalidation => range == "bytes=0-0",
+        }
+    {
+        return fault.response(&data, start, end);
+    }
     (
         StatusCode::PARTIAL_CONTENT,
         [(
@@ -669,6 +694,265 @@ async fn repeated_ranges_come_from_the_fragment_cache() {
         h.upstream.requests()
     );
     assert_eq!(h.ytdlp_calls(), 1);
+}
+
+#[tokio::test]
+async fn upstream_range_rejects_missing_or_malformed_content_range() {
+    let mut cases = vec![vec![], vec!["bytes {start}-{end}/{total}"; 2]];
+    for value in [
+        "items {start}-{end}/{total}",
+        "bytes */{total}",
+        "bytes {start}-{end}",
+        "bytes {start}-{end}/{total}, bytes {start}-{end}/{total}",
+        "bytes +0-{end}/{total}",
+        "bytes -1-{end}/{total}",
+        "bytes 0-18446744073709551616/{total}",
+        "bytes {start}-{end}/18446744073709551616",
+        "bytes {start}-{end}/+999999",
+        "bytes {start}-{end}/{total} trailing",
+    ] {
+        cases.push(vec![value]);
+    }
+    let mut accepted = Vec::new();
+    for values in cases {
+        let h = Harness::new().await;
+        h.upstream.fault(
+            RangeTarget::All,
+            Fault::Headers(values.iter().map(|v| (*v).to_owned()).collect()),
+        );
+        let status = h.get(None).await.status();
+        if status != StatusCode::BAD_GATEWAY {
+            accepted.push((values, status));
+        }
+        assert_eq!(h.ytdlp_calls(), 1, "bad ranges are not URL refusals");
+    }
+    assert!(
+        accepted.is_empty(),
+        "invalid responses accepted: {accepted:?}"
+    );
+}
+
+#[tokio::test]
+async fn upstream_range_rejects_wrong_start_end_and_total() {
+    let mut accepted = Vec::new();
+    for value in [
+        "bytes 1-{end}/{total}",
+        "bytes 2-1/{total}",
+        "bytes 0-65536/999999",
+        "bytes {start}-{end}/{end}",
+        "bytes {start}-{end}/0",
+        "bytes 0-18446744073709551615/*",
+    ] {
+        let h = Harness::new().await;
+        h.upstream
+            .fault(RangeTarget::All, Fault::Headers(vec![value.to_owned()]));
+        let status = h.get(None).await.status();
+        if status != StatusCode::BAD_GATEWAY {
+            accepted.push((value, status));
+        }
+    }
+    assert!(accepted.is_empty(), "wrong ranges accepted: {accepted:?}");
+}
+
+#[tokio::test]
+async fn upstream_range_accepts_case_insensitive_byte_unit() {
+    let reference = Harness::new().await.full().await;
+    let h = Harness::new().await;
+    h.upstream.fault(
+        RangeTarget::All,
+        Fault::Headers(vec!["ByTeS {start}-{end}/{total}".to_owned()]),
+    );
+    assert_eq!(h.full().await, reference);
+}
+
+#[tokio::test]
+async fn upstream_range_accepts_eof_clipped_probe() {
+    assert!(VIDEO.len() < PlayConfig::default().probe_bytes as usize);
+    assert!(AUDIO.len() < PlayConfig::default().probe_bytes as usize);
+    let h = Harness::new().await;
+    let file = h.full().await;
+    let [video, audio] = flat_tracks(&file);
+    assert_eq!(video.bytes(&file), source_media(VIDEO));
+    assert_eq!(audio.bytes(&file), source_media(AUDIO));
+    assert!(
+        h.upstream
+            .requests()
+            .iter()
+            .any(|r| r.ends_with("bytes=0-65535"))
+    );
+}
+
+#[tokio::test]
+async fn upstream_range_accepts_unknown_total() {
+    let reference = Harness::new().await.full().await;
+    for omit_filesize in [false, true] {
+        let h = Harness::new().await;
+        if omit_filesize {
+            h.edit_info(|info| {
+                for format in info["formats"].as_array_mut().unwrap() {
+                    format.as_object_mut().unwrap().remove("filesize");
+                }
+            });
+        }
+        h.upstream.fault(RangeTarget::All, Fault::UnknownTotal);
+        assert_eq!(h.full().await, reference);
+        h.advance(2 * 3600);
+        assert_eq!(h.full().await, reference);
+        assert_eq!(h.ytdlp_calls(), 1);
+    }
+}
+
+#[tokio::test]
+async fn upstream_range_rejects_truncated_body() {
+    let h = Harness::new().await;
+    h.upstream.fault(RangeTarget::All, Fault::Truncated);
+    assert_eq!(h.get(None).await.status(), StatusCode::BAD_GATEWAY);
+}
+
+#[tokio::test]
+async fn upstream_range_rejects_excess_body() {
+    let h = Harness::new().await;
+    h.upstream.fault(RangeTarget::All, Fault::Excess);
+    assert_eq!(h.get(None).await.status(), StatusCode::BAD_GATEWAY);
+}
+
+#[tokio::test]
+async fn upstream_range_rejects_content_length_mismatch() {
+    let mut statuses = Vec::new();
+    for fault in [Fault::LengthMismatch, Fault::ShortLength] {
+        let h = Harness::new().await;
+        h.upstream.fault(RangeTarget::All, fault);
+        statuses.push(h.get(None).await.status());
+    }
+    assert_eq!(statuses, [StatusCode::BAD_GATEWAY; 2]);
+}
+
+#[tokio::test]
+async fn upstream_range_validates_sample_table_reads() {
+    let h = Harness::new().await;
+    h.upstream
+        .fault(RangeTarget::Nonzero, Fault::Headers(vec![]));
+    assert_eq!(h.get(None).await.status(), StatusCode::BAD_GATEWAY);
+    assert!(
+        !h.body_reads().is_empty(),
+        "the fault must reach the table reader"
+    );
+}
+
+#[tokio::test]
+async fn upstream_range_validates_stale_header_revalidation() {
+    let h = Harness::new().await;
+    h.head().await;
+    h.advance(2 * 3600);
+    h.upstream
+        .fault(RangeTarget::Revalidation, Fault::Headers(vec![]));
+    assert_eq!(
+        h.get(Some("bytes=0-99")).await.status(),
+        StatusCode::BAD_GATEWAY
+    );
+    assert!(h.checks() > 0);
+    assert_eq!(h.ytdlp_calls(), 1);
+    *h.upstream.fault.lock().unwrap() = None;
+    assert_eq!(
+        h.get(Some("bytes=0-99")).await.status(),
+        StatusCode::PARTIAL_CONTENT
+    );
+}
+
+#[tokio::test]
+async fn upstream_range_stops_before_appending_excess_bytes() {
+    let mut outcomes = Vec::new();
+    for media in [false, true] {
+        let h = Harness::new().await;
+        if media {
+            h.head().await;
+        }
+        let producer = Arc::new(Overflow::default());
+        h.upstream.fault(
+            if media {
+                RangeTarget::Nonzero
+            } else {
+                RangeTarget::All
+            },
+            Fault::Overflow(producer.clone()),
+        );
+        let request = h.client.get(format!("{}{ID}", h.base));
+        let task = tokio::spawn(async move {
+            let response = request.send().await.unwrap();
+            (response.status(), response.bytes().await)
+        });
+        let stopped = producer.stopped_before_eof(1).await;
+        producer.release();
+        let (status, body) = tokio::time::timeout(Duration::from_secs(5), task)
+            .await
+            .unwrap()
+            .unwrap();
+        outcomes.push((media, stopped, status, body.is_err()));
+    }
+    for (media, stopped, status, body_error) in outcomes {
+        assert!(
+            stopped,
+            "the reader waited for the producer's withheld EOF, media={media}"
+        );
+        assert_eq!(
+            status,
+            if media {
+                StatusCode::OK
+            } else {
+                StatusCode::BAD_GATEWAY
+            }
+        );
+        if media {
+            assert!(body_error);
+        }
+    }
+}
+
+#[tokio::test]
+async fn invalid_range_is_not_cached() {
+    let reference = Harness::new().await.full().await;
+    let h = Harness::new().await;
+    h.head().await;
+    let before = h.upstream.requests().len();
+    h.upstream
+        .fault(RangeTarget::Nonzero, Fault::Headers(vec![]));
+    let response = h.get(None).await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let rejected = response.bytes().await.is_err();
+    let faulty: Vec<_> = h.upstream.requests()[before..].to_vec();
+    *h.upstream.fault.lock().unwrap() = None;
+    let retry_at = h.upstream.requests().len();
+    assert_eq!(h.full().await, reference);
+    let retry = &h.upstream.requests()[retry_at..];
+    assert!(rejected, "invalid range metadata was served as media");
+    assert!(
+        faulty.iter().any(|r| retry.contains(r)),
+        "failed media was cached: {faulty:?} {retry:?}"
+    );
+    let cached_at = h.upstream.requests().len();
+    assert_eq!(h.full().await, reference);
+    assert_eq!(h.upstream.requests().len(), cached_at);
+    assert_eq!(h.ytdlp_calls(), 1);
+}
+
+#[tokio::test]
+async fn invalid_range_does_not_publish_sample_tables() {
+    let reference = Harness::new().await.full().await;
+    let index = tempfile::tempdir().unwrap();
+    let tables = index.path().join("tables");
+    let h = Harness::with_index(Some(tables.clone())).await;
+    h.upstream
+        .fault(RangeTarget::Nonzero, Fault::Headers(vec![]));
+    let status = h.get(None).await.status();
+    let stored = std::fs::read_dir(&tables).map_or(0, |entries| entries.count());
+    *h.upstream.fault.lock().unwrap() = None;
+    assert_eq!(h.full().await, reference);
+    assert_eq!(table_names(&tables).len(), 2);
+    assert_eq!(status, StatusCode::BAD_GATEWAY);
+    assert_eq!(
+        stored, 0,
+        "invalid metadata was published as a sample table"
+    );
 }
 
 #[tokio::test]

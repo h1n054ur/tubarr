@@ -39,7 +39,20 @@ async fn get(
     peer: &str,
     bearer: Option<&str>,
 ) -> (StatusCode, String) {
+    get_forwarded(app, uri, peer, bearer, &[]).await
+}
+
+async fn get_forwarded(
+    app: &axum::Router,
+    uri: &str,
+    peer: &str,
+    bearer: Option<&str>,
+    forwarded: &[&str],
+) -> (StatusCode, String) {
     let mut request = Request::get(uri);
+    for value in forwarded {
+        request = request.header("x-forwarded-for", *value);
+    }
     if let Some(token) = bearer {
         request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
     }
@@ -133,6 +146,70 @@ async fn metrics_without_any_token_follow_the_play_networks() {
     assert_eq!(
         get(&app, "/metrics", PUBLIC, None).await.0,
         StatusCode::FORBIDDEN
+    );
+}
+
+const PROXY_METRICS: &str =
+    "[metrics]\nenabled = true\n[auth]\ntrusted_proxies = [\"172.16.0.2/32\", \"172.16.0.3/32\"]\n";
+
+#[tokio::test]
+async fn tokenless_metrics_require_a_client_behind_trusted_proxies() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, app) = app(dir.path(), PROXY_METRICS).await;
+    for values in [
+        vec![],
+        vec!["172.16.0.3"],
+        vec!["172.16.0.2", "172.16.0.3"],
+        vec!["::ffff:172.16.0.3"],
+    ] {
+        let (status, body) =
+            get_forwarded(&app, "/metrics", "172.16.0.2:4000", None, &values).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{values:?}");
+        assert!(body.is_empty(), "refused scrapes expose no metrics");
+    }
+}
+
+#[tokio::test]
+async fn tokenless_metrics_preserve_forwarded_client_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_, app) = app(dir.path(), PROXY_METRICS).await;
+    for values in [
+        vec![""],
+        vec!["nope"],
+        vec!["192.168.1.20,"],
+        vec!["192.168.1.20", ""],
+        vec!["192.168.1.20, 203.0.113.7", "172.16.0.3"],
+    ] {
+        assert_eq!(
+            get_forwarded(&app, "/metrics", "172.16.0.2:4000", None, &values)
+                .await
+                .0,
+            StatusCode::FORBIDDEN,
+            "{values:?}"
+        );
+    }
+    for values in [
+        vec!["nope, 192.168.1.20, 172.16.0.3"],
+        vec!["203.0.113.7", "192.168.1.20, 172.16.0.3"],
+        vec!["::ffff:192.168.1.20, ::ffff:172.16.0.3"],
+    ] {
+        assert_eq!(
+            get_forwarded(&app, "/metrics", "[::ffff:172.16.0.2]:4000", None, &values)
+                .await
+                .0,
+            StatusCode::OK,
+            "{values:?}"
+        );
+    }
+    assert_eq!(
+        get_forwarded(&app, "/metrics", PUBLIC, None, &["192.168.1.20"])
+            .await
+            .0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        get(&app, "/metrics", "192.168.1.20:4000", None).await.0,
+        StatusCode::OK
     );
 }
 

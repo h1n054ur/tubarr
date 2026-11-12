@@ -1333,10 +1333,304 @@ async fn a_podcast_matches_by_the_number_in_tvdb_titles() {
     ));
     let late = f.run().await;
     assert_eq!(late.released, 0);
+    assert_eq!(late.not_wanted, 1, "#2400 only, #2571 awaits metadata");
+    assert_missing_podcast_target(&f.notes().await, "j2571", 2571);
+}
+
+fn assert_missing_podcast_target(notes: &HashMap<String, Unmatched>, id: &str, number: u64) {
+    let note = notes
+        .get(id)
+        .unwrap_or_else(|| panic!("missing note for {id}"));
+    assert_eq!(note.state, UnmatchedState::Unsure);
+    assert_eq!((note.season, note.episode, note.part), (None, None, None));
     assert_eq!(
-        late.not_wanted, 2,
-        "#2400, and #2571 has no free listed date"
+        note.reason,
+        format!(
+            "no TVDB title names #{number} yet and no free listed air date fits this upload, \
+             wait for TVDB/Sonarr metadata or pin it to its episode"
+        )
     );
+}
+
+async fn missing_podcast_target_fixture(day: i64) -> Fixture {
+    let f = podcast_fixture(true).await;
+    *f.candidates.videos.lock().unwrap() = vec![cand(
+        "j2571",
+        JRE,
+        &jre("#2571 - Next Guest"),
+        cdt(day, 14),
+        Some(150),
+    )];
+    f.meta.height("j2571", 1080);
+    f
+}
+
+#[tokio::test]
+async fn a_podcast_missing_target_note_clears_when_metadata_arrives() {
+    // No unnumbered date is near this upload: Dating::Unlisted.
+    let mut f = missing_podcast_target_fixture(28).await;
+    let first = f.run().await;
+    assert!(f.releases().await.is_empty());
+    assert_eq!(
+        (first.released, first.not_wanted, first.notes_changed),
+        (0, 0, 1)
+    );
+    let notes = f.notes().await;
+    assert_missing_podcast_target(&notes, "j2571", 2571);
+    let note = notes["j2571"].clone();
+    assert!(f.db.set_unmatched_ignored(note.id, true).await.unwrap());
+
+    let again = f.run().await;
+    assert_eq!(
+        (again.released, again.not_wanted, again.notes_changed),
+        (0, 0, 0)
+    );
+    assert_eq!(f.notes().await["j2571"], note);
+    let ignored: bool = sqlx::query_scalar("SELECT ignored FROM unmatched WHERE id = ?")
+        .bind(note.id)
+        .fetch_one(f.db.pool())
+        .await
+        .unwrap();
+    assert!(
+        ignored,
+        "normal note reconciliation preserves the ignored flag"
+    );
+
+    // The same upload becomes releasable by number, without needing a date fallback.
+    f.episodes.push(WantedEpisode {
+        season: 2026,
+        episode: 140,
+        air_date: Some("2026-10-28".to_owned()),
+        title: Some("#2571 - Next Guest".to_owned()),
+        monitored: true,
+    });
+    let resolved = f.run().await;
+    assert_eq!(f.releases().await, releases(&[("S2026E140", "j2571")]));
+    assert_eq!(
+        (
+            resolved.released,
+            resolved.not_wanted,
+            resolved.notes_changed
+        ),
+        (1, 0, 0)
+    );
+    assert!(f.notes().await.is_empty(), "stale notes use normal cleanup");
+    assert_eq!(f.run().await.notes_changed, 0);
+}
+
+#[tokio::test]
+async fn a_podcast_missing_target_with_no_known_maximum_stays_unsure() {
+    // Both an empty catalogue and a distant TBA catalogue have no known running number.
+    for empty in [false, true] {
+        let mut f = missing_podcast_target_fixture(28).await;
+        f.episodes.retain(|e| !empty && e.episode == 139);
+        let report = f.run().await;
+        assert!(f.releases().await.is_empty());
+        assert_eq!(
+            (report.released, report.not_wanted, report.notes_changed),
+            (0, 0, 1)
+        );
+        assert_missing_podcast_target(&f.notes().await, "j2571", 2571);
+    }
+}
+
+#[tokio::test]
+async fn a_podcast_missing_target_on_an_occupied_neighbour_stays_unsure() {
+    // Dating succeeds, but the 23rd has its own full upload and cannot take the 24th's.
+    let f = missing_podcast_target_fixture(24).await;
+    f.candidates.videos.lock().unwrap().push(cand(
+        "j2570",
+        JRE,
+        &jre("#2570 - New Guest"),
+        cdt(23, 14),
+        Some(150),
+    ));
+    f.meta.height("j2570", 1080);
+    let report = f.run().await;
+    assert_eq!(f.releases().await, releases(&[("S2026E139", "j2570")]));
+    assert_eq!(
+        (report.released, report.not_wanted, report.notes_changed),
+        (1, 0, 1)
+    );
+    assert_missing_podcast_target(&f.notes().await, "j2571", 2571);
+}
+
+#[tokio::test]
+async fn a_podcast_missing_target_on_a_pinned_neighbour_stays_unsure() {
+    let f = missing_podcast_target_fixture(24).await;
+    f.candidates.videos.lock().unwrap().push(cand(
+        "pinned",
+        JRE,
+        &jre("#2570 - Pinned Guest"),
+        cdt(23, 14),
+        Some(150),
+    ));
+    f.meta.height("pinned", 1080);
+    f.db.set_pin(
+        f.mapping.id,
+        &PinTarget::Episode {
+            season: 2026,
+            episode: 139,
+        },
+        "pinned",
+    )
+    .await
+    .unwrap();
+    let report = f.run().await;
+    assert_eq!(f.releases().await, releases(&[("S2026E139", "pinned")]));
+    assert_eq!(
+        (report.released, report.not_wanted, report.notes_changed),
+        (1, 0, 1)
+    );
+    let notes = f.notes().await;
+    assert_missing_podcast_target(&notes, "j2571", 2571);
+    assert!(!notes.contains_key("pinned"));
+}
+
+#[tokio::test]
+async fn a_podcast_missing_target_with_an_explicit_neighbour_date_stays_unsure() {
+    let f = missing_podcast_target_fixture(24).await;
+    f.candidates.videos.lock().unwrap()[0].title = jre("#2571 - Next Guest | 24 October 2026");
+    let report = f.run().await;
+    assert!(
+        f.releases().await.is_empty(),
+        "a title date must not drift to the 23rd"
+    );
+    assert_eq!(
+        (report.released, report.not_wanted, report.notes_changed),
+        (0, 0, 1)
+    );
+    assert_missing_podcast_target(&f.notes().await, "j2571", 2571);
+}
+
+#[tokio::test]
+async fn a_podcast_missing_target_still_uses_a_free_tba_neighbour() {
+    let f = missing_podcast_target_fixture(24).await;
+    let report = f.run().await;
+    assert_eq!(f.releases().await, releases(&[("S2026E139", "j2571")]));
+    assert_eq!(
+        (report.released, report.not_wanted, report.notes_changed),
+        (1, 0, 0)
+    );
+    assert!(f.notes().await.is_empty());
+}
+
+#[tokio::test]
+async fn podcast_missing_target_notes_do_not_include_filtered_or_short_uploads() {
+    for day in [24, 28] {
+        let mut f = missing_podcast_target_fixture(day).await;
+        f.mapping.excludes = vec!["Members".to_owned()];
+        *f.candidates.videos.lock().unwrap() = vec![
+            cand(
+                "short",
+                JRE,
+                &jre("#2571 - Short Guest"),
+                cdt(day, 14),
+                Some(12),
+            ),
+            cand(
+                "looked-up-short",
+                JRE,
+                &jre("#2572 - Short Guest"),
+                cdt(day, 14),
+                None,
+            ),
+            cand(
+                "excluded",
+                JRE,
+                &jre("#2573 - Members episode"),
+                cdt(day, 14),
+                Some(150),
+            ),
+            cand("promo", JRE, &jre("#2574 - Promo"), cdt(day, 14), Some(150)),
+            cand(
+                "shorts",
+                JRE,
+                &jre("#2575 #shorts"),
+                cdt(day, 14),
+                Some(150),
+            ),
+            cand(
+                "other-show",
+                JRE,
+                "JRE MMA Show #2576",
+                cdt(day, 14),
+                Some(150),
+            ),
+            cand(
+                "other-channel",
+                TVF,
+                &jre("#2577 - Guest"),
+                cdt(day, 14),
+                Some(150),
+            ),
+            cand(
+                "old",
+                JRE,
+                &jre("#2400 - Old Guest"),
+                cdt(day, 14),
+                Some(150),
+            ),
+        ];
+        f.meta.set(
+            "looked-up-short",
+            Known {
+                duration_secs: Some(12 * MIN),
+                ..Known::default()
+            },
+        );
+        let report = f.run().await;
+        assert!(f.releases().await.is_empty());
+        assert!(
+            f.notes().await.is_empty(),
+            "filtered candidates do not gain missing-target notes"
+        );
+        assert_eq!(report.not_wanted, 3, "two short uploads and one old number");
+    }
+}
+
+#[tokio::test]
+async fn podcast_missing_target_notes_use_the_mapping_duration_floor() {
+    for day in [24, 28] {
+        let mut f = missing_podcast_target_fixture(day).await;
+        // An explicit date cannot drift onto the free TBA neighbour on the 23rd.
+        f.candidates.videos.lock().unwrap()[0].title =
+            jre(&format!("#2571 - Next Guest | {day} October 2026"));
+        f.mapping.min_duration_secs = Some(180 * MIN);
+        let short = f.run().await;
+        assert!(f.releases().await.is_empty());
+        assert!(f.notes().await.is_empty());
+        assert_eq!((short.not_wanted, short.notes_changed), (1, 0));
+
+        // The watcher's duration is absent, but the resolver knows it meets the floor.
+        f.candidates.videos.lock().unwrap()[0].duration_secs = None;
+        f.meta.set(
+            "j2571",
+            Known {
+                duration_secs: Some(180 * MIN),
+                height: Some(1080),
+                ..Known::default()
+            },
+        );
+        let full = f.run().await;
+        assert!(f.releases().await.is_empty());
+        assert_eq!((full.not_wanted, full.notes_changed), (0, 1));
+        assert_missing_podcast_target(&f.notes().await, "j2571", 2571);
+    }
+}
+
+#[tokio::test]
+async fn podcast_missing_target_notes_keep_unknown_duration_provisionally_eligible() {
+    for day in [24, 28] {
+        let f = missing_podcast_target_fixture(day).await;
+        f.candidates.videos.lock().unwrap()[0].title =
+            jre(&format!("#2571 - Next Guest | {day} October 2026"));
+        f.candidates.videos.lock().unwrap()[0].duration_secs = None;
+        let report = f.run().await;
+        assert!(f.releases().await.is_empty());
+        assert_eq!((report.not_wanted, report.notes_changed), (0, 1));
+        assert_missing_podcast_target(&f.notes().await, "j2571", 2571);
+    }
 }
 
 #[tokio::test]
